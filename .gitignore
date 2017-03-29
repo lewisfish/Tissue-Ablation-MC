@@ -3,3 +3,12 @@ build/
 *.o
 *.mod
 data/
+*.aux
+*.log
+*.toc
+*.snm
+*.nav
+*.out
+*.odp
+*.pdf
+
