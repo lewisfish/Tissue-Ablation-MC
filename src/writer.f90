@@ -19,7 +19,7 @@ CONTAINS
 
    
    !maybe not right
-   jmeanGLOBAL =jmeanGLOBAL * ((2.*xmax)**2./(nphotons*numproc*(2.*xmax/nxg)*(2.*ymax/nyg)*(2.*zmax/nzg)))
+   jmeanGLOBAL =jmeanGLOBAL * (1./(nphotons*numproc*(2.*xmax/nxg)*(2.*ymax/nyg)*(2.*zmax/nzg)))
 
 
    inquire(iolength=i)jmeanGLOBAL

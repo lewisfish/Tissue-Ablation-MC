@@ -7,16 +7,18 @@ module threedfinite
 
     contains
 
-    subroutine heat2D(jmean)
+    subroutine heat2D()
 
         ! use mpi
         use shrinkarray
+        use constants, only : fileplace
 
         implicit none
-        ! 
-        real              :: u_xx, u_yy, diagx, diagy, weightx, weighty, tmp(50,50)
+        
+        ! real, intent(INOUT)  :: jmean(:,:,:)
+        real              :: u_xx, u_yy, diagx, diagy, weightx, weighty, tmp(50,50), jmean(200,200,200)
         real              :: delt, time, k0, hx, hy, hx2, hy2!, tmp, pwr, r
-        real, allocatable :: T0(:,:), T(:,:), tissue(:,:), jmean(:,:,:), laser(:,:)
+        real, allocatable :: T0(:,:), T(:,:), tissue(:,:), laser(:,:)
         integer           :: N, i, j, p, u, size_x, size_y, o
 
         ! integer :: error, numproc, id, comm, new_comm, ndims, dims(2), me, min_comm, col_id, col_coords(2)
@@ -94,7 +96,6 @@ module threedfinite
 
         hx = 1. / (size_x + 2)
         hy = 1. / (size_y + 2)
-        print*,hx*50
 
         hx2 = 1. / hx**2
         hy2 = 1. / hy**2.
@@ -103,21 +104,18 @@ module threedfinite
         
         !allocate mesh
         allocate(T(0:size_x+1, 0:size_y+1))
-        allocate(jmean(200,200,200), laser(50,50))
+        allocate(laser(50,50))
         allocate(T0(0:size_x+1, 0:size_y+1))
         allocate(tissue(200, 200))
 
         inquire(iolength=i)jmean
-        open(newunit=u,file='jmean.dat',access='direct',form='unformatted',recl=i)
+        open(newunit=u, file=trim(fileplace)//'jmean/jmean.dat',access='direct',form='unformatted',recl=i)
         read(u,rec=1)jmean
-        close(u)
-        ! open(newunit=u,file='laser.dat')
-        ! read(u,*)laser
-        ! close(u)
 
-        ! ! do i = 1, 200
-            tissue(:,:) = jmean(100,:,:)
-        ! ! end do
+
+        jmean = jmean * 2.e1
+
+        tissue(:,:) = jmean(100,:,:)
         call shrink(tissue, laser)
         deallocate(tissue)
         allocate(tissue(50,50))
@@ -126,9 +124,9 @@ module threedfinite
 
         t = 0.
         t0 = 37.
-        t0(:,0) = 25. ! front face
+        t0(:,0) = 37. ! front face
         t0(:,N+1) = 37.  ! back face
-        t0(N+1,:) = 37.  ! side face
+        t0(N+1,:) = 25.  ! side face
         t0(0,:) = 37.    ! side face
 
         ! pwr = 2 !watts
@@ -158,22 +156,22 @@ module threedfinite
         o = int(1./delt)
 
         do i = 1,50
-            do j = 50, 1, -1
-                tmp(i,j) = laser(i,j)
+            do j = 1,50
+                tmp(i,j) = laser(j,i)
             end do
         end do
         laser = tmp
 
-            open(newunit=u,file='laser.dat')
+        open(newunit=u,file='laser.dat')
         do i = 1,50
             write(u,*)(laser(i,j),j=1,50)
         end do
         close(u)
-        ! call exit(0)
+
         do p = 1, o
      !        write(*,FMT="(A1,A,t21,F6.2,A)",ADVANCE="NO") achar(13), &
      ! & " Percent Complete: ", (real(p)/real(o))*100.0, "%"
-            if(mod(p,10000)==0)print*,real(p)/real(o)*100.,time
+            if(mod(p,10000)==0)print*,nint(real(p)/real(o)*100.)
             do i = 1, size_x
                 do j = 1,size_y
                     ! if(tissue(i,j) < 1.)then

@@ -10,6 +10,7 @@ CONTAINS
    !
       use photon_vars, only : xp, yp, zp
       use iarray,      only : jmean, rhokap
+      use opt_prop,    only : mua
 
       
    
@@ -45,7 +46,7 @@ CONTAINS
          if(taurun + taucell < tau)then
             taurun = taurun + taucell
             d = d + dcell
-            jmean(celli, cellj, cellk) = jmean(celli, cellj, cellk) + dcell
+            jmean(celli, cellj, cellk) = jmean(celli, cellj, cellk) + dcell*mua
 
             call update_pos(xcur, ycur, zcur, celli, cellj, cellk, dcell, .TRUE., dir, delta)
          
@@ -53,7 +54,7 @@ CONTAINS
 
             dcell = (tau - taurun) / rhokap(celli,cellj,cellk)
             d = d + dcell
-            jmean(celli, cellj, cellk) = jmean(celli, cellj, cellk) + dcell
+            jmean(celli, cellj, cellk) = jmean(celli, cellj, cellk) + dcell*mua
             call update_pos(xcur, ycur, zcur, celli, cellj, cellk, dcell, .FALSE., dir, delta)
             exit
          end if

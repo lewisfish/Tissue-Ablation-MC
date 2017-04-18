@@ -21,6 +21,8 @@ SRCS =      ran2.f \
             stokes.f90 \
             sourceph.f90 \
             writer.f90 \
+            shrinkarray.f90 \
+            2dFD.f90 \
             mcpolar.f90 
             
 OBJECTS = $(SRCS:.f90=.o)
