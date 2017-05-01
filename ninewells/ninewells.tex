@@ -32,7 +32,7 @@
 \begin{frame}{}
 
 \begin{equation}
-\dfrac{\partial u}{\partial t} - \triangledown^2 u = 0
+\dfrac{\partial u}{\partial t} = \alpha \triangledown^2 u + S
 \end{equation}
 
 u(0,y,z,t)=u(L,y,z,t)=0 \\
@@ -85,9 +85,14 @@ Solution:\\
 Shrink grid $=>$ Lose resolution cant model small elements
 Parallelize $=>$ Not as straight forward as parallelizing MC code
 
-\includegraphics[scale=0.2]{high.png}
+
+\begin{equation}
+\Omega(t) = \int_{t_0}^{t_f} A e^{(- \tfrac{\Delta E}{RT}) dT}
+\end{equation}
+
+%\includegraphics[scale=0.2]{high.png}
 \hskip 1cm
-\includegraphics[scale=0.2]{low.png}
+%\includegraphics[scale=0.2]{low.png}
 \end{frame}
 
 \end{document}

@@ -5,15 +5,15 @@ program threedfinite
     implicit none
     
     real              :: u_xx, u_yy, u_zz, diagx, diagy, diagz, weightx, weighty, weightz
-    real              :: delt, time, k0, hx, hy, hz, hx2, hy2, hz2, jmean(26,26,26), old(200,200,200)
+    real              :: delt, time, k0, hx, hy, hz, hx2, hy2, hz2, jmean(50,50,50), old(200,200,200)
     real              :: rho, kappa, c_heat
     real*8:: popo(200,200,200)
-    real, allocatable :: T0(:,:,:), T(:,:,:)
+    real, allocatable :: T0(:,:,:), T(:,:,:), tissue(:,:,:)
     integer           :: N, i, j, k, p, u, size_x, size_y, size_z, o,q,w
     character(len=3)  :: fn
 
 
-    N = 26
+    N = 50
 
     inquire(iolength=i)popo
     open(newunit=u,file='jmean.dat',access='direct',form='unformatted',recl=i)
@@ -57,6 +57,9 @@ program threedfinite
     !allocate mesh
     allocate(T(0:size_x+1, 0:size_y+1, 0:size_z+1))
     allocate(T0(0:size_x+1, 0:size_y+1, 0:size_z+1))
+    allocate(tissue(N, N, N))
+
+    tissue = 0.
 
     t = 0.
     t0 = 37.
@@ -85,7 +88,7 @@ program threedfinite
 
     o = int(100./delt)
     q = 0
-   inquire(iolength=w)t0(1:N,1:N,1:N)
+   inquire(iolength=w)tissue
 
     do p = 1, o
         write(*,FMT="(A1,A,t21,F6.2,A)",ADVANCE="NO") achar(13), &
@@ -100,15 +103,24 @@ program threedfinite
                 end do
             end do
         end do
-    if(mod(p,100) == 0)then
-        write(fn,'(I3)') q
-       open(newunit=u,file='temp_'//trim(adjustl(fn))//'.dat',access='direct',status='REPLACE',form='unformatted',&
-            recl=w)
-       write(u,rec=1) t0(1:N,1:N,1:N)
-       close(u)
-       q = q + 1
-    end if
+    ! if(mod(p,100) == 0)then
+    !     write(fn,'(I3)') q
+    !    open(newunit=u,file='temp_'//trim(adjustl(fn))//'.dat',access='direct',status='REPLACE',form='unformatted',&
+    !         recl=w)
+    !    write(u,rec=1) t0(1:N,1:N,1:N)
+    !    close(u)
+    !    q = q + 1
+    ! end if
     time = time + delt
+    call Arrhenius(t0, delt, tissue)
+    if(mod(p,1000) == 0)then
+        write(fn,'(I3)') q
+        open(newunit=u,file='tissue_'//trim(adjustl(fn))//'.dat',access='direct',status='REPLACE',form='unformatted',&
+        recl=w)
+        write(u,rec=1) tissue
+        close(u)
+        q = q + 1
+    end if
     end do
     print*,
     print*,time,p,n
@@ -120,4 +132,39 @@ program threedfinite
    write(u,rec=1) t0
    close(u)
 
+
+   inquire(iolength=i)tissue
+
+   open(newunit=u,file='tissue3D.dat',access='direct',status='REPLACE',form='unformatted',&
+   recl=i)
+   write(u,rec=1) tissue
+   close(u)
+
+
+   contains
+    subroutine Arrhenius(Temp, delt, tissue)
+
+        implicit none
+
+        real, intent(IN)    :: temp(:,:,:), delt
+        real, intent(INOUT) :: tissue(:,:,:)
+        real*8 :: a, g, r
+        integer :: x, y, z
+
+        a = 3.1d91!2.9e27
+        g = 6.28e5!2.4e5
+        r = 8.314
+
+        do x = 1, 50
+            do y = 1, 50
+                do z = 1, 50
+                    if(temp(x, y, z) >= 44)then
+                        tissue(x, y, z) = tissue(x, y, z) + delt*A*exp(-G/(R*(temp(x,y,z)+273)))
+                        ! print*,delt*A*exp(-G/(R*(temp(x,y,z)+273)))
+                    end if
+                end do
+            end do
+        end do
+
+    end subroutine  Arrhenius
 end program threedfinite
