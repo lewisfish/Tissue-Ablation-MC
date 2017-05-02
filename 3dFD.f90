@@ -7,7 +7,8 @@ program threedfinite
     real              :: u_xx, u_yy, u_zz, diagx, diagy, diagz, weightx, weighty, weightz
     real              :: delt, time, k0, hx, hy, hz, hx2, hy2, hz2, old(200,200,200), jmean(50,50,50)
     real, allocatable :: T0(:,:,:), T(:,:,:)
-    integer           :: N, i, j, k, p, u, size_x, size_y, size_z, o
+    integer           :: N, i, j, k, p, u, size_x, size_y, size_z, o,q,w
+    character(len=2)  :: fn
 
 
     N = 50
@@ -69,7 +70,10 @@ program threedfinite
     weightz = k0*delt/(hz*hz)
 
     o = int(0.1/delt)
-
+   inquire(iolength=q)t0
+   print*,o
+   w=0
+   ! call exit(0)
     do p = 1, o
         write(*,FMT="(A1,A,t21,F6.2,A)",ADVANCE="NO") achar(13), &
  & " Percent Complete: ", (real(p)/real(o))*100.0, "%"
@@ -79,10 +83,18 @@ program threedfinite
                     u_xx = (t0(i+1, j,   k)   - 2.*t0(i,j,k) + t0(i-1, j,   k))  * hx2
                     u_yy = (t0(i,   j+1, k)   - 2.*t0(i,j,k) + t0(i,   j-1, k))  * hy2
                     u_zz = (t0(i,   j,   k+1) - 2.*t0(i,j,k) + t0(i,   j,   k-1))* hz2
-                    t0(i,j,k) = t0(i,j,k) + k0*delt*(u_xx + u_yy + u_zz) + jmean(i,j,k)
+                    t0(i,j,k) = t0(i,j,k) + k0*delt*(u_xx + u_yy + u_zz)! + jmean(i,j,k)
                 end do
             end do
         end do
+    if(mod(p,10000) ==0)then
+        write(fn,'(I2.2)') w
+        w = w + 1
+        open(newunit=u,file='temperature'//fn//'.dat',access='direct',status='REPLACE',form='unformatted',&
+        recl=q)
+        write(u,rec=1) t0
+        close(u)
+    end if
     time = time + delt
     end do
     print*,
