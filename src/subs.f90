@@ -73,7 +73,6 @@ CONTAINS
    zface=0.
    rhokap=0.
    jmeanGLOBAL = 0.
-   absorb = 0.
    
    end SUBROUTINE zarray
 
@@ -87,7 +86,7 @@ CONTAINS
    implicit none
    
    allocate(xface(nxg+1),yface(nyg+1),zface(nzg+1))
-   allocate(rhokap(nxg,nyg,nzg), absorb(nxg, nyg, nzg))
+   allocate(rhokap(nxg,nyg,nzg))
    allocate(jmean(nxg,nyg,nzg), jmeanGLOBAL(nxg,nyg,nzg))
    
    

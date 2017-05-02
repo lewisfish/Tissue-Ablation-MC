@@ -33,13 +33,14 @@ module shrinkarray
         new = 0.
 
         do i = 1, m
+            print*,(i-1)*div+1, (i)*div
             do j = 1, m
                 do k = 1, m
                     tmp = 0.
-                            !black magic that I WILL forget...
-                    do l = i*div-(div/2)-1, (i*div-(div/2)-1)+div-1
-                        do o = j*div-(div/2)-1, (j*div-(div/2)-1)+div-1
-                            do p = k*div-(div/2)-1, (k*div-(div/2)-1)+div-1
+                    !black magic that I WILL forget...                   old integers works for div = 4 only
+                    do l = (i-1)*div+1, (i)*div                         !i*div-(div/2)-1, (i*div-(div/2)-1)+div-1
+                        do o = (j-1)*div+1, (j)*div                     !j*div-(div/2)-1, (j*div-(div/2)-1)+div-1
+                            do p = (k-1)*div+1, (k)*div                 !k*div-(div/2)-1, (k*div-(div/2)-1)+div-1
                                 tmp = tmp + old(l,o,p)
                             end do
                         end do
@@ -49,6 +50,7 @@ module shrinkarray
                 end do
             end do
         end do
+call exit(0)
     end subroutine shrink3D
 
     subroutine shrink2D(old, new)
