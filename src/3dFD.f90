@@ -7,38 +7,48 @@ Module Heat
 
     contains
 
-    subroutine heat_sim_3D(old, tissue, N, counter)
+    subroutine heat_sim_3D(oldj, oldt, N, counter)
 
         use shrinkarray
         use constants, only : fileplace
 
         implicit none
         
-        real,   intent(IN)  :: old(:,:,:)
-        real,   intent(OUT) :: tissue(:,:,:)
-        integer, intent(IN) :: N, counter
+        real,   intent(IN)    :: oldj(:,:,:)
+        real,   intent(INOUT) :: oldt(:,:,:)
+        integer, intent(IN)   :: N, counter
 
         real              :: u_xx, u_yy, u_zz, diagx, diagy, diagz, weightx, weighty, weightz
         real              :: delt, time, k0, hx, hy, hz, hx2, hy2, hz2
         real              :: rho, kappa, c_heat
-        real, allocatable :: T0(:,:,:), T(:,:,:), jmean(:,:,:)
+        real, allocatable :: T0(:,:,:), T(:,:,:), jmean(:,:,:), tissue(:,:,:)
         integer           :: i, j, k, p, u, size_x, size_y, size_z, o,q,w
         character(len=3)  :: fn
 
         allocate(jmean(N,N,N))
+        allocate(tissue(n,n,n))
 
-        if(size(jmean,1) /= size(old,1))then
-            call shrink(old, jmean)
+        if(size(jmean,1) /= size(oldj,1))then
+            call shrink(oldj, jmean)
+        else
+            jmean = oldj
         end if
 
-        jmean = jmean*50.
+        if(size(tissue,1) /= size(oldt,1))then
+            call shrink(oldt, tissue)
+        else
+            tissue = oldt
+        end if
+
+
+        jmean = jmean*1.
 
         kappa = 0.0056 ! W/cm C
         rho = 1.07 ! g/cm^3
         c_heat = 3.4 !J/g C
 
         rho = rho/1000.
-        c_heat = c_heat*10.
+        c_heat = c_heat*1000.
 
         k0 = kappa / (rho * c_heat)
         !k0 = 1.07d-3/(0.0056*3400.)!1.
@@ -78,9 +88,10 @@ Module Heat
         weighty = k0*delt/(hy*hy)
         weightz = k0*delt/(hz*hz)
 
-        o = int(0.01/delt)
+        o = int(100.e-3/delt)
         q = 0
         inquire(iolength=w)tissue
+        print*,o
 
         do p = 1, o
             write(*,FMT="(A1,A,t21,F6.2,A)",ADVANCE="NO") achar(13), &
@@ -115,6 +126,7 @@ Module Heat
         !     q = q + 1
         ! end if
         end do
+        print*,
         print*,time,p,n
 
         write(fn,'(I3.3)') counter
@@ -123,6 +135,12 @@ Module Heat
             form='unformatted', recl=w)
         write(u,rec=1) tissue
         close(u)
+
+
+        if(size(tissue,1) /= size(oldt,1))then
+            call unshrink(tissue, oldt)
+        end if
+
 
         inquire(iolength=w)t0
         open(newunit=u,file=trim(fileplace)//'jmean/temperature-'//trim(fn)//'.dat',access='direct',status='REPLACE', &
@@ -149,9 +167,9 @@ Module Heat
         g = 6.28e5!2.4e5
         r = 8.314
 
-        do x = 1, 50
-            do y = 1, 50
-                do z = 1, 50
+        do x = 1, size(temp,1)
+            do y = 1, size(temp,1)
+                do z = 1, size(temp,1)
                     if(temp(x, y, z) >= 44)then
                         tissue(x, y, z) = tissue(x, y, z) + delt*A*exp(-G/(R*(temp(x,y,z)+273)))
                         ! print*,delt*A*exp(-G/(R*(temp(x,y,z)+273)))

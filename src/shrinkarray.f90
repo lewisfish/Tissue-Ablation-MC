@@ -7,8 +7,13 @@ module shrinkarray
         module procedure shrink3D
     end interface
 
+    interface unshrink
+        ! module procedure unshrink2D
+        module procedure unshrink3D
+    end interface
+
     private
-    public :: shrink
+    public :: shrink, unshrink
 
     contains
 
@@ -33,7 +38,6 @@ module shrinkarray
         new = 0.
 
         do i = 1, m
-            print*,(i-1)*div+1, (i)*div
             do j = 1, m
                 do k = 1, m
                     tmp = 0.
@@ -50,7 +54,6 @@ module shrinkarray
                 end do
             end do
         end do
-call exit(0)
     end subroutine shrink3D
 
     subroutine shrink2D(old, new)
@@ -87,4 +90,39 @@ call exit(0)
             end do
         end do
     end subroutine shrink2D
+
+
+    subroutine unshrink3D(old, new)
+
+        implicit none
+
+        real, intent(IN)    :: old(:,:,:)
+        real, intent(OUT)   :: new(:,:,:)
+
+        integer :: i, j, k, p, l, o, div, n, m
+
+        ! i,j,k iterate over old
+        ! p,l,o iterate over new
+
+        n = size(new,1)
+        m = size(old,1)
+        div = n/m
+
+        new = 0.
+
+        do i = 1, m
+            do j = 1, m
+                do k = 1, m
+                    do l = (i-1)*div+1, (i)*div                         
+                        do o = (j-1)*div+1, (j)*div                     
+                            do p = (k-1)*div+1, (k)*div                 
+                                new(l,o,p) = old(i,j,k)
+                            end do
+                        end do
+                    end do
+
+                end do
+            end do
+        end do
+    end subroutine unshrink3D
 end module shrinkarray

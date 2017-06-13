@@ -20,12 +20,13 @@ use Heat
 
 implicit none
 
-integer          :: nphotons,iseed,j,xcell,ycell,zcell, N, counter
+integer          :: nphotons,iseed,j,xcell,ycell,zcell, N, counter, u, i
 logical          :: tflag, flag
 DOUBLE PRECISION :: nscatt, nscattGLOBAL
 real             :: xmax,ymax,zmax, ran,delta, start, finish, ran2
 real, allocatable :: tissue(:,:,:)
 integer          :: id, error, numproc
+character(len=3) :: fn
 
 !set directory paths
 call directory
@@ -35,9 +36,9 @@ call alloc_array
 call zarray
 
 N = 50 ! points for heat sim
-allocate(tissue(N,N,N))
+allocate(tissue(nxg,nyg,nzg))
 tissue = 0.
-counter = 0.
+counter = 0
 call MPI_init(error)
 
 call MPI_Comm_size(MPI_COMM_WORLD, numproc, error)
@@ -63,7 +64,7 @@ iseed=-95648324+id
 
 iseed=-abs(iseed)  ! Random number seed must be negative for ran2
 
-call init_opt4
+call init_opt1
 
 if(id == 0)then
    print*, ''      
@@ -71,7 +72,7 @@ if(id == 0)then
 end if
 
 !***** Set up density grid *******************************************
-call gridset(xmax,ymax,zmax,id)
+call gridset(xmax, ymax, zmax, id)
 !***** Set small distance for use in optical depth integration routines 
 !***** for roundoff effects when crossing cell walls
 delta = 1.e-8*(2.*zmax/nzg)
@@ -86,7 +87,7 @@ print*,'Photons now running on core: ',id
 do while(flag)
    do j = 1, nphotons
 
-      call init_opt4
+      call init_opt1
 
       tflag=.FALSE.
 
@@ -106,10 +107,8 @@ do while(flag)
          ran = ran2(iseed)
          
          if(ran < albedo)then!interacts with tissue
-
             call stokes(iseed)
             nscatt = nscatt + 1
-
          else
             tflag = .true.
             exit
@@ -120,8 +119,6 @@ do while(flag)
       end do
 
 
-
-
    end do      ! end loop over nph photons
    call MPI_REDUCE(jmean, jmeanGLOBAL, (nxg*nyg*nzg),MPI_DOUBLE_PRECISION, MPI_SUM,0,MPI_COMM_WORLD,error)
    call MPI_BARRIER(MPI_COMM_WORLD, error)
@@ -129,12 +126,24 @@ do while(flag)
    if(id == 0)then
       jmeanGLOBAL = jmeanGLOBAL * (1./(nphotons*numproc*(2.*xmax/nxg)*(2.*ymax/nyg)*(2.*zmax/nzg)))
       call heat_sim_3d(jmeanGLOBAL, tissue, N, counter)
-
       counter = counter + 1
       if(counter == 10)flag = .false.
    end if
    call MPI_BARRIER(MPI_COMM_WORLD, error)
+
    call mpi_bcast(flag,1,MPI_LOGICAL, 0, MPI_COMM_WORLD, error)
+   call mpi_bcast(tissue, nxg*nyg*nzg, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, error)
+
+   where(tissue > 1000)
+         rhokap = 0.
+      end where
+   if(id == 0)then
+      write(fn,'(I3.3)')counter
+      inquire(iolength=i)rhokap
+      open(newunit=u,file=trim(fileplace)//'jmean/rhokap-'//trim(fn)//'.dat',access='direct',form='unformatted',recl=i)
+      write(u,rec=1)rhokap
+   end if
+   call MPI_BARRIER(MPI_COMM_WORLD, error)
    if(.not. flag)exit
    jmean = 0.
 end do
@@ -156,7 +165,7 @@ call MPI_BARRIER(MPI_COMM_WORLD, error)
 if(id == 0)then
    print*,'Average # of scatters per photon:',(nscattGLOBAL/(nphotons*numproc))
    !write out files
-   call writer(xmax,ymax,zmax,nphotons, numproc)
+   call writer(xmax, ymax, zmax, nphotons, numproc)
    print*,'write done'
 end if
 

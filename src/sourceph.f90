@@ -27,31 +27,31 @@ CONTAINS
    radius2 = .05**2.
 
    select case(j)
-   case(0:100000)!bottom left
+   case(0:10000)!bottom left
       offy =  .5
       offx = -.5
-   case(100001:200000)!mid left
+   case(10001:20000)!mid left
       offy = 0.
       offx = -.5
-   case(200001:300000)!top left
+   case(20001:30000)!top left
       offy = -.5
       offx = -.5
-   case(300001:400000)!bottom mid
+   case(30001:40000)!bottom mid
       offy = .5
       offx = 0.
-   case(400001:500000)!middle
+   case(40001:50000)!middle
       offy = 0.
       offx = 0.
-   case(500001:600000)!top mid
+   case(50001:60000)!top mid
       offy = -.5
       offx = 0.
-   case(600001:700000)!bottom right
+   case(60001:70000)!bottom right
       offy = .5
       offx = .5
-   case(700001:800000)!mid right
+   case(70001:80000)!mid right
       offy = 0.
       offx = .5
-   case(800001:900000)!top right
+   case(80001:90000)!top right
       offy = -.5
       offx = .5      
    end select  
