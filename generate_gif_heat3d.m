@@ -1,16 +1,16 @@
-function generate_gif_heat3d
+function generate_gif
 
 % Load parameters
 % Number of frames
-numFrames=269;
+numFrames=10;
 % Time step between 2 frames
-step = 0.01;
+step = 0.1;
 animated(1,1,1,numFrames) = 0;
-ndim = 26;
+ndim = 50;
 
 % Main loop
 for l=0:numFrames
-file = strcat('temp_',num2str(l),'.dat');
+file = strcat('tissue_',num2str(l),'.dat');
 fid=fopen(file,'r');        
 raw = fread(fid,(ndim)^3,'float');
 fclose(fid);
@@ -27,7 +27,7 @@ shading faceted;
 view([-42,22]);
 hc=colorbar;
 set(hc,'position',[0.932 0.3 0.02 0.6]);
-caxis([0 90])
+caxis([0 10000])
 xlabel('x domain');
 ylabel('y domain');
 zlabel('z domain');
@@ -42,6 +42,6 @@ else
 end  
 end
 % Write final animated gif
-imwrite(animated,cmap,'Heat_3D.gif','DelayTime',step,'LoopCount',inf); 
+imwrite(animated,cmap,'rhokap_3D.gif','DelayTime',step,'LoopCount',inf); 
 
 end
