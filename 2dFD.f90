@@ -179,14 +179,14 @@ module threedfinite
                     ! if(tissue(i,j) < 1.)then
                         u_xx = (t0(i+1,j)     - 2.*t0(i,j) + t0(i-1, j))  * hx2
                         u_yy = (t0(i,  j+1)   - 2.*t0(i,j) + t0(i,   j-1))  * hy2
-                            t0(i,j) = t0(i,j) + k0*delt*(u_xx + u_yy)+ k0*laser(i,j)
+                            t0(i,j) = t0(i,j) + k0*delt*(u_xx + u_yy)!+ k0*laser(i,j)
                     ! else
                     !     t0(i,j) = 37
                     ! end if
                 end do
             end do
         time = time + delt
-        call Arrhenius(t0, time, tissue)
+        ! call Arrhenius(t0, time, tissue)
         end do
         print*,
         print*,'time, loops, grid points'
