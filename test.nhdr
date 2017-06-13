@@ -1,9 +1,0 @@
-NRRD0001
-content: jmean
-dimension: 3
-type: float
-sizes: 27 27 27
-spacings: 1 1 1
-encoding: raw
-endian: little
-data file: ./temperature.dat

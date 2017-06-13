@@ -86,6 +86,7 @@ program threedfinite
     weighty = k0*delt/(hy*hy)
     weightz = k0*delt/(hz*hz)
 
+
     o = int(100./delt)
     q = 0
    inquire(iolength=w)tissue
@@ -111,6 +112,7 @@ program threedfinite
     !    close(u)
     !    q = q + 1
     ! end if
+
     time = time + delt
     call Arrhenius(t0, delt, tissue)
     if(mod(p,1000) == 0)then

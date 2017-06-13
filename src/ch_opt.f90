@@ -14,10 +14,10 @@ CONTAINS
 
    hgg = 0.9
    g2  = hgg**2.
-   mua = .1
-   mus = 174.5!. / (1. - hgg)
+   mua = 865.13   ! taken from water absop data
+   mus = 0.!. / (1. - hgg)
 
-   kappa  = mus + mua !+ 5.3e-3
+   kappa  = mus + mua
    albedo = mus / kappa
 
    end subroutine init_opt1

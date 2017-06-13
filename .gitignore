@@ -1,3 +1,4 @@
+jmean-ablation/
 bin/
 build/
 *.o
@@ -12,3 +13,6 @@ data/
 *.odp
 *.pdf
 *.dat
+*.gif
+*.synctex.gz
+

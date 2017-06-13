@@ -1,7 +1,6 @@
 FCOMP = mpifort
-FCFLAGS = -O2 -freal-4-real-8 
-#FCFLAGS = -O2 -freal-4-real-8 -g -fcheck=all -fbounds-check -fbacktrace 
-#-ffpe-trap=zero,overflow,underflow 
+FCFLAGS = -O2 -freal-4-real-8
+#FCFLAGS = -O2 -freal-4-real-8 -g -fcheck=all -fbounds-check -fbacktrace -ffpe-trap=zero,overflow,underflow 
 #FCFLAGS = -Wall -Wextra -pedantic
 #LDFLAGS = 
 	#goes after $^ -pg 
@@ -22,7 +21,7 @@ SRCS =      ran2.f \
             sourceph.f90 \
             writer.f90 \
             shrinkarray.f90 \
-            2dFD.f90 \
+            3dFD.f90 \
             mcpolar.f90 
             
 OBJECTS = $(SRCS:.f90=.o)
