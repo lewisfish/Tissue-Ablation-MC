@@ -37,10 +37,7 @@ program ring
                         !comm, direction, shift, source, dest, error
     call mpi_cart_shift(new_comm, 0, 1, left, right, error)
 
-
-!     print*,id,right,left
-! call exit(0)
-    numpoints = 40
+    numpoints = 200
 
     if(id == 0)then
         !do decomp
@@ -87,31 +84,18 @@ program ring
     out = 0.
     t0 = 0.
     !boundary conditions
-    ! if(id == 0)then
-        tmp = 0.
-        tmp = 100.
-        tmp(0,:) = 0.
-        tmp(:,0) = 0.
-        tmp(numpoints+1,:) = 0.
-        tmp(:,numpoints+1) = 0.
-    !     do i = 1, numproc-1
-    !         lo = i*size_y
-    !         hi = lo + size_y+1
-    !         ! call mpi_send(tmp(:, lo:hi), size(t0), mpi_real, i, tag, new_comm, error)
-    !         call mpi_send(tmp, size(tmp), mpi_real, i, tag, new_comm, error)
-
-    !     end do
-    !     ! t0 = tmp(:, 0:size_y+1)
-    ! else
-    !     call mpi_recv(tmp, size(tmp), mpi_real, 0, tag, new_comm, recv_status, error)
-    !     ! call mpi_recv(t0, size(t0), mpi_real, 0, tag, new_comm, recv_status, error)
-    ! end if
+    tmp = 0.
+    tmp = 100.
+    tmp(0,:) = 0.
+    tmp(:,0) = 0.
+    tmp(numpoints+1,:) = 0.
+    tmp(:,numpoints+1) = 0.
 
     o = int(.1/delt)
     !do heat sim
     do p = 1, o
         if(mod(p, 10000) == 0 .and. id == 0)print*,str(real(p)/real(o)*100.),' %'
-        do i = 1, numpoints
+        do i = xi, xf
             do j = yi, yf!1, n
                 u_xx = (tmp(i+1,j)     - 2.*tmp(i,j) + tmp(i-1, j))  * hx2
                 u_yy = (tmp(i,  j+1)   - 2.*tmp(i,j) + tmp(i,   j-1))  * hy2
@@ -120,76 +104,46 @@ program ring
         end do
         call mpi_barrier(new_comm, error)
 
-        !exchange data
-        if(mod(id, 2)== 0)then
-            ! print*,yf
-            call MPI_Sendrecv(tmp(:,20), size(tmp(:,20)), mpi_real, right, tag, &
-                              tmp(:,21), size(tmp(:,21)), mpi_real, right, tag, &
-                              new_comm, recv_status, error)
-        else
-            call MPI_Sendrecv(tmp(:,21), size(tmp(:,21)), mpi_real, left, tag, &
-                              tmp(:,20), size(tmp(:,20)), mpi_real, left, tag, &
-                              new_comm, recv_status, error)
-        end if
+        !send_recv data to right
+        call MPI_Sendrecv(tmp(:,yf), size(tmp(:,yf)), mpi_real, right, tag, &
+                          tmp(:,yf+1), size(tmp(:,yf+1)), mpi_real, right, tag, &
+                          new_comm, recv_status, error)
+        !send_recv data to right
+
+        call MPI_Sendrecv(tmp(:,yi), size(tmp(:,yi)), mpi_real, left, tag, &
+                          tmp(:,yi-1), size(tmp(:,yi-1)), mpi_real, left, tag, &
+                          new_comm, recv_status, error)
 
         call mpi_barrier(new_comm, error)
-
-        ! if(mod(id, 2) /= 0)then
-        !     call MPI_Sendrecv(tmp(:,yf), size(tmp(:,yf)), mpi_real, right, tag, &
-        !                       tmp(:,yf+1), size(tmp(:,yf+1)), mpi_real, right, tag, &
-        !                       new_comm, recv_status, error)
-        ! else
-        !     call MPI_Sendrecv(tmp(:,yi+1), size(tmp(:,yi+1)), mpi_real, left, tag, &
-        !                       tmp(:,yi), size(tmp(:,yi)), mpi_real, left, tag, &
-        !                       new_comm, recv_status, error)
-        ! end if
-
     end do
 
-    call mpi_allreduce(tmp, out, size(tmp), mpi_real, mpi_sum, new_comm, error)
+
+    !send data to master process
     if(id == 0)then
-        out=out/real(numproc)
-        open(newunit=u, file='2d_parrallel_'//str(numproc)//'.dat')
-        do i = 0, size(out,1)
-            write(u,*)out(i,:)
+        do i = 1, numproc-1
+            lo = i*size_y+1
+            hi = lo + size_y-1
+            call mpi_recv(tmp(:, lo:hi), size(tmp(:,lo:hi)), mpi_real, i, tag, new_comm, recv_status, error)
         end do
-        close(u)
-
-
-        open(newunit=u,file='2d_par_slice_'//str(numproc)//'.dat')
-        do i = 1, size(out,1)-1
-            write(u,*)out((size(out,1)-1)/2,i)
-        end do
-        close(u)
+    else
+        call mpi_send(tmp(:, yi:yf), size(tmp(:, yi:yf)), mpi_real, 0, tag, new_comm, error)
     end if
 
+    !write data out on master process
+    if(id == 0)then
+        open(newunit=u, file='2d_parrallel_'//str(numproc)//'.dat')
+        do i = 0, size(tmp,1)
+            write(u,*)tmp(i,:)
+        end do
+        close(u)
+        print*,'2d_parrallel_'//str(numproc)//'.dat'
 
-
-
-    ! if(id /= 0 )then
-    !     call mpi_send(t0, size(t0), mpi_real, 0, tag, new_comm, error)
-    ! else
-    !     tmp = 0.
-    !     do i = 1, numproc-1
-    !         lo = i*size_y
-    !         hi = lo + size_y+1
-    !         call mpi_recv(tmp(:, lo:hi), size(t0), mpi_real, i, tag, new_comm, recv_status, error)
-    !     end do
-    !     tmp(:, 0:size_y+1) = t0
-
-    !     open(newunit=u, file='2d_parrallel_'//str(numproc)//'.dat')
-    !     do i = 0, size(tmp,1)-1
-    !         write(u,*)tmp(i,:)
-    !     end do
-    !     close(u)
-
-
-    !     open(newunit=u,file='2d_par_slice_'//str(numproc)//'.dat')
-    !     do i = 0, size(tmp,1)-1
-    !         write(u,*)tmp((size(tmp,1)-1)/2,i)
-    !     end do
-    !     close(u)
-    ! end if
-
+        open(newunit=u,file='2d_par_slice_'//str(numproc)//'.dat')
+        do i = 1, size(tmp,1)-1
+            write(u,*)tmp((size(tmp,1)-1)/2,i)
+        end do
+        close(u)
+        print*,'2d_par_slice_'//str(numproc)//'.dat'
+    end if
     call mpi_finalize(error)
 end program ring
