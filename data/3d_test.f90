@@ -14,8 +14,8 @@ program ring
 
     !variables for heat
     integer :: size_x, size_y, size_z, n, p, o, u, numpoints, lo, hi
-    real ::  k0, hx, hx2, hy, hy2, hz, hz2, delt, u_xx, u_yy, u_zz,start, finish
-    real, allocatable :: t0(:,:,:), tmp(:,:,:)
+    real ::  k0, hx, hx2, hy, hy2, hz, hz2, delt, u_xx, u_yy, u_zz
+    real, allocatable :: tmp(:,:,:)
 
     !init all mpi shizz
     comm = mpi_comm_world
@@ -53,8 +53,6 @@ program ring
     call mpi_barrier(new_comm, error)
     call MPI_Bcast(N, 1, MPI_integer ,0 , new_comm, error)
 
-    if(id==0)call cpu_time(start)
-
 !init heat shizz
     k0 = 1.
     size_x = numpoints
@@ -70,7 +68,6 @@ program ring
     hz2 = 1. / hz**2
 
     delt = 0.125 * min(hx,hy,hz)**3/k0
-    allocate(t0(0:n*numproc+1, 0:size_y+1, 0:size_z+1))
     allocate(tmp(0:n*numproc+1, 0:n*numproc+1, 0:n*numproc+1))
 
     xi = 1
@@ -85,7 +82,6 @@ program ring
 
     if(id == 0)print*,size(tmp(:,1,:))
 
-    t0 = 0.
     !boundary conditions
     tmp = 100.
     tmp(0,:,:) = 0. !side face
@@ -94,12 +90,6 @@ program ring
     tmp(numpoints+1,:,:) = 0. !side face
     tmp(:,numpoints+1,:) = 0. !back face
     tmp(:,:,numpoints+1) = 0. !top face
-
-    open(newunit=u,file='init_3d.dat',access='stream',form='unformatted')
-    write(u)tmp
-    close(u)
-
-    ! call exit(0)
 
     o = int(.1/delt)
     !do heat sim
@@ -131,10 +121,6 @@ program ring
         call mpi_barrier(new_comm, error)
     end do
 
-    if(id==0)then
-        call cpu_time(finish)
-        print*,finish-start
-    end if
     !send data to master process
     if(id == 0)then
         do i = 1, numproc-1
@@ -155,13 +141,6 @@ program ring
         write(u)tmp
         close(u)
         print*,'3d_parrallel_'//str(numproc)//'.dat'
-
-        open(newunit=u,file='3d_par_slice_'//str(numproc)//'.dat')
-        do i = 1, size(tmp,1)-1
-            ! write(u,*)tmp((size(tmp,1)-1)/2,i)
-        end do
-        close(u)
-        print*,'3d_par_slice_'//str(numproc)//'.dat'
     end if
     call mpi_finalize(error)
 end program ring
