@@ -12,6 +12,9 @@ program ring
     integer :: recv_status(MPI_STATUS_SIZE)
     logical :: periods(1), reorder
 
+    !vars for subarray
+    integer :: starts(3), oldsize(3), newsize(3), subarr
+
     !variables for heat
     integer :: size_x, size_y, size_z, n, p, o, u, numpoints, lo, hi
     real ::  k0, hx, hx2, hy, hy2, hz, hz2, delt, u_xx, u_yy, u_zz
@@ -41,7 +44,7 @@ program ring
 
     if(id == 0)then
         !do decomp
-        if(mod(numpoints,numproc) /= 0)then
+        if(mod(numpoints, numproc) /= 0)then
             print('(I2.1,a,I2.1)'),numpoints,' not divisable by : ', numproc
             call mpi_finalize(error)
             error stop
@@ -68,28 +71,45 @@ program ring
     hz2 = 1. / hz**2
 
     delt = 0.125 * min(hx,hy,hz)**3/k0
-    allocate(tmp(0:n*numproc+1, 0:n*numproc+1, 0:n*numproc+1))
 
     xi = 1
     xf = size_x
 
-    yi = id*size_y+1
-    if(yi == 0)yi = 1
-    yf = yi + size_y-1
+    yi = 1
+    yf = size_y
+
+    ! yi = id*size_y+1
+    ! if(yi == 0)yi = 1
+    ! yf = yi + size_y-1
 
     zi = 1
     zf = size_z
 
-    if(id == 0)print*,size(tmp(:,1,:))
+    ! allocate(tmp(0:n*numproc+1, 0:n*numproc+1, 0:n*numproc+1)) !old
+    allocate(tmp(xi-1:xf+1,yi-1:yf+1,zi-1:zf+1))
+
+    !create mpi sub array to avoid temp array creation
+    oldsize = [size(tmp,1), size(tmp,2), size(tmp,3)]
+    newsize = [[size(tmp,1)-2, 1, size(tmp,3)-2]]
+    starts = [xi, yf, zi]
+
+    print*,oldsize,newsize,starts
+
+    call mpi_type_create_subarray(3, oldsize, newsize, starts, mpi_order_fortran, &
+                                  mpi_real, subarr, error)
+    call mpi_type_commit(subarr, error)
+
 
     !boundary conditions
     tmp = 100.
     tmp(0,:,:) = 0. !side face
-    tmp(:,0,:) = 0. !front face
     tmp(:,:,0) = 0. !bottom face
     tmp(numpoints+1,:,:) = 0. !side face
-    tmp(:,numpoints+1,:) = 0. !back face
     tmp(:,:,numpoints+1) = 0. !top face
+
+    if(id==numproc-1)tmp(:,yf+1,:) = 0. !back face
+    if(id==0)tmp(:,0,:) = 0. !front face
+
 
     o = int(.1/delt)
     !do heat sim
@@ -107,6 +127,8 @@ program ring
             end do
         end do
         call mpi_barrier(new_comm, error)
+
+        !need to add subarray send here. might have wrong subarray definition though...
 
         !send_recv data to right
         call MPI_Sendrecv(tmp(:,yf,:), size(tmp(:,yf,:)), mpi_real, right, tag, &
