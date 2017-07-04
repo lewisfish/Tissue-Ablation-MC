@@ -1,6 +1,10 @@
 #!/bin/bash
 
+#defaults
 NUM_CORES=1
+debug=0
+help=0
+
 
 while [[ $# -gt 0 ]];
 do
@@ -15,6 +19,15 @@ case $key in
     NUM_CORES="0"
     shift # past argument
     ;;
+    -d)
+    NUM_CORES="8"
+    debug='1'
+    shift #past argument
+    ;;
+    -h)
+    Help='1'
+    shift #past argument
+    ;;
     *)
         # unknown option
     ;;
@@ -22,9 +35,23 @@ esac
 shift # past argument or value
 done
 
+if [ "$Help" = 1 ];then
+  echo 'Usage: ./install.sh [option]'
+  echo 'Compile and run mcgrid'
+  echo 
+  echo '   -n, -n #of cores           compiles and run code on # cores. Defualt is 1 core'
+  echo '   -d                         compiles and runs code with debug flags on 1 core'
+  echo '   -m                         compiles the code'
+  exit 0
+fi
 cd src
+set -e
 
-make clean && make 
+if [ "$debug" = 1 ];then
+    make clean && make debug
+else
+    make clean && make 
+fi
 
 cd ..
 if [ ! -d "data" ]; then

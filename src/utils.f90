@@ -47,7 +47,7 @@ module utils
         module procedure str_I32
         module procedure str_I64
         module procedure str_Iarray
-        module procedure str_R4
+        ! module procedure str_R4
         module procedure str_R8
         module procedure str_R8array
         module procedure str_logicalarray
@@ -170,25 +170,25 @@ module utils
         end function str_iarray
 
 
-        function str_R4(i, len)
+        ! function str_R4(i, len)
 
-            implicit none
+        !     implicit none
 
-            real,              intent(IN) :: i
-            integer, optional, intent(IN) :: len
+        !     real,              intent(IN) :: i
+        !     integer, optional, intent(IN) :: len
 
-            character(len=:), allocatable :: str_R4
-            character(len=100) :: string
+        !     character(len=:), allocatable :: str_R4
+        !     character(len=100) :: string
 
-            write(string,'(f100.8)') I
+        !     write(string,'(f100.8)') I
 
-            if(present(len))then
-                str_R4 = trim(adjustl(string))
-                str_R4 = trim(adjustl(str_R4(:len)))
-            else
-                str_R4 = trim(adjustl(string))
-            end if
-        end function str_R4
+        !     if(present(len))then
+        !         str_R4 = trim(adjustl(string))
+        !         str_R4 = trim(adjustl(str_R4(:len)))
+        !     else
+        !         str_R4 = trim(adjustl(string))
+        !     end if
+        ! end function str_R4
 
 
         function str_R8(i, len)

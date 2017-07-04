@@ -17,16 +17,20 @@ use ch_opt
 use stokes_mod
 use writer_mod
 use Heat
+use utils
 
 implicit none
 
 integer          :: nphotons,iseed,j,xcell,ycell,zcell, N, counter, u, i
-logical          :: tflag, flag
+logical          :: tflag, flag, end
 DOUBLE PRECISION :: nscatt, nscattGLOBAL
 real             :: xmax,ymax,zmax, ran,delta, start, finish, ran2
-real, allocatable :: tissue(:,:,:)
-integer          :: id, error, numproc
+real, allocatable :: tissue(:,:,:), temp(:,:,:), tissueGLOBAL(:,:,:)
 character(len=3) :: fn
+
+! mpi variables
+integer :: new_comm, error, right, left, id, numproc, dims(2), ndims, tag, recv_status(mpi_status_size), comm
+logical :: periods(1), reorder
 
 !set directory paths
 call directory
@@ -35,15 +39,33 @@ call directory
 call alloc_array
 call zarray
 
-N = 50 ! points for heat sim
-allocate(tissue(nxg,nyg,nzg))
+N = 200 ! points for heat sim
+allocate(tissue(nxg, nyg, nzg), tissueGLOBAL(nxg,nyg,nzg))
+allocate(temp(0:N+1, 0:N+1, 0:N+1))
+
+temp = 0.
 tissue = 0.
 counter = 0
+comm = MPI_COMM_WORLD
+
 call MPI_init(error)
 
-call MPI_Comm_size(MPI_COMM_WORLD, numproc, error)
+call MPI_Comm_size(comm, numproc, error)
 
-call MPI_Comm_rank(MPI_COMM_WORLD, id, error)
+!setup topology variables
+tag = 1
+dims = 0
+periods = .false.
+reorder = .true.
+ndims = 1
+
+!create cartesian topology on cpu
+call mpi_dims_create(numproc, ndims, dims, error)
+call mpi_cart_create(comm, ndims, dims, periods, reorder, new_comm, error)
+call mpi_comm_rank(new_comm, id, error)
+
+!get neighbours
+call mpi_cart_shift(new_comm, 0, 1, left, right, error)
 
 !**** Read in parameters from the file input.params
 open(10,file=trim(resdir)//'input.params',status='old')
@@ -78,21 +100,23 @@ call gridset(xmax, ymax, zmax, id)
 delta = 1.e-8*(2.*zmax/nzg)
 nscatt = 0
 
-
 call cpu_time(start)
 flag = .true.
+end = .true.
 !loop over photons 
 call MPI_Barrier(MPI_COMM_WORLD, error)
 print*,'Photons now running on core: ',id
-do while(flag)
+
+
+do while(end)
    do j = 1, nphotons
 
       call init_opt1
 
       tflag=.FALSE.
 
-      if(mod(j,10000) == 0)then
-         print *, j,' scattered photons completed on core: ',id
+      if(mod(j,100000) == 0)then
+         print *, str(j)//' scattered photons completed on core: '//str(id)
       end if
        
    !***** Release photon from point source *******************************
@@ -120,31 +144,31 @@ do while(flag)
 
 
    end do      ! end loop over nph photons
-   call MPI_REDUCE(jmean, jmeanGLOBAL, (nxg*nyg*nzg),MPI_DOUBLE_PRECISION, MPI_SUM,0,MPI_COMM_WORLD,error)
+   call MPI_REDUCE(jmean, jmeanGLOBAL, (nxg*nyg*nzg),MPI_DOUBLE_PRECISION, MPI_SUM,0,new_comm,error)
    call MPI_BARRIER(MPI_COMM_WORLD, error)
 
+   if(id==0)jmeanGLOBAL = jmeanGLOBAL * (1./(nphotons*numproc*(2.*xmax/nxg)*(2.*ymax/nyg)*(2.*zmax/nzg)))
+call heat_sim_3d(jmeanGLOBAL, tissue, temp, N, flag, id, numproc, error, new_comm, tag, recv_status, right, left, counter)
+
+   counter = counter + 1
+   if(counter == 10)end = .false.
+
+
+   call MPI_BARRIER(MPI_COMM_WORLD, error)
+   
    if(id == 0)then
-      jmeanGLOBAL = jmeanGLOBAL * (1./(nphotons*numproc*(2.*xmax/nxg)*(2.*ymax/nyg)*(2.*zmax/nzg)))
-      call heat_sim_3d(jmeanGLOBAL, tissue, N, counter)
-      counter = counter + 1
-      if(counter == 10)flag = .false.
-   end if
-   call MPI_BARRIER(MPI_COMM_WORLD, error)
-
-   call mpi_bcast(flag,1,MPI_LOGICAL, 0, MPI_COMM_WORLD, error)
-   call mpi_bcast(tissue, nxg*nyg*nzg, MPI_DOUBLE_PRECISION, 0, MPI_COMM_WORLD, error)
-
-   where(tissue > 1000)
-         rhokap = 0.
+      where(tissue> 1000)
+            rhokap = 0.
       end where
-   if(id == 0)then
-      write(fn,'(I3.3)')counter
-      inquire(iolength=i)rhokap
-      open(newunit=u,file=trim(fileplace)//'jmean/rhokap-'//trim(fn)//'.dat',access='direct',form='unformatted',recl=i)
-      write(u,rec=1)rhokap
    end if
-   call MPI_BARRIER(MPI_COMM_WORLD, error)
-   if(.not. flag)exit
+
+   call MPI_Bcast(rhokap, size(rhokap), MPI_DOUBLE_PRECISION ,0 , new_comm, error)
+
+   if(id == 0)then
+      open(newunit=u,file=trim(fileplace)//'jmean/rhokap-'//str(counter)//'.dat',access='stream',form='unformatted')
+      write(u)rhokap
+   end if
+   if(.not. end)exit
    jmean = 0.
 end do
 
@@ -155,11 +179,11 @@ else
       print*, 'time taken ~',floor(finish-start/60.),'s'
 end if
 
-call MPI_REDUCE(jmean, jmeanGLOBAL, (nxg*nyg*nzg),MPI_DOUBLE_PRECISION, MPI_SUM,0,MPI_COMM_WORLD,error)
+call MPI_REDUCE(jmean, jmeanGLOBAL, (nxg*nyg*nzg),MPI_DOUBLE_PRECISION, MPI_SUM,0,new_comm,error)
 call MPI_BARRIER(MPI_COMM_WORLD, error)
 
 
-call MPI_REDUCE(nscatt,nscattGLOBAL,1,MPI_DOUBLE_PRECISION,MPI_SUM,0,MPI_COMM_WORLD,error)
+call MPI_REDUCE(nscatt,nscattGLOBAL,1,MPI_DOUBLE_PRECISION,MPI_SUM,0,new_comm,error)
 call MPI_BARRIER(MPI_COMM_WORLD, error)
 
 if(id == 0)then
