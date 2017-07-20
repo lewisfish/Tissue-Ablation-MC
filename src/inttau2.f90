@@ -173,7 +173,7 @@ CONTAINS
             end if
          else
             print*,'Error in update_pos...',dir
-            call exit(0)
+            error stop 0
          end if
       else
       
@@ -268,7 +268,7 @@ CONTAINS
             cella = 1
          else
             print*,'Error in Repeat_bounds...'
-            call exit(0)
+            error stop 0
          end if
       end if
       if(cellb == -1)then
@@ -280,7 +280,7 @@ CONTAINS
             cellb = 1
          else
             print*,'Error in Repeat_bounds...'
-            call exit(0)
+            error stop 0
          end if
       endif
       

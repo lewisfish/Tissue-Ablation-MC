@@ -40,10 +40,8 @@ subroutine heat_sim_3D(jmean, tissue, temp, numpoints, flag, id, numproc, error,
         end if
 
         !send N to all processes
-        call mpi_barrier(new_comm, error)
         call MPI_Bcast(N, 1, MPI_integer ,0 , new_comm, error)
 
-        ! call mpi_barrier(new_comm, error)
         ! call MPI_Bcast(jmean, size(jmean), MPI_real ,0 , new_comm, error)
 
 
@@ -83,8 +81,6 @@ subroutine heat_sim_3D(jmean, tissue, temp, numpoints, flag, id, numproc, error,
         zi = 1
         zf = size_z
 
-
-
         !allocate mesh
         allocate(T0(0:numpoints+1, 0:numpoints+1, zi-1:zf+1))
         allocate(jtmp(numpoints, numpoints, zi:zf))
@@ -102,37 +98,20 @@ subroutine heat_sim_3D(jmean, tissue, temp, numpoints, flag, id, numproc, error,
             if(id == 0)t0(:,:,zi-1) = 25.  ! top face 
             flag = .false.
         else
-            if(id == 0)then
-                do i = 1, numproc-1
-                    lo = i*size_z+1
-                    hi = lo + size_z-1
-                    call mpi_send(temp(:, :, lo:hi), size(temp(:, :,lo:hi)), mpi_double_precision, i, tag, new_comm, error)
-                end do
-                t0(:,:,zi:zf) = temp(:,:,zi:zf)
-            else
-                call mpi_recv(t0(:,:, zi:zf), size(t0(:,:,zi:zf)), mpi_double_precision, 0, tag, new_comm, recv_status, error)
-            end if
+            call mpi_scatter(temp, size(temp(:,:,zi:zf)), mpi_double_precision, t0(:,:,zi:zf), size(t0(:,:,zi:zf)), &
+                             mpi_double_precision, 0, new_comm, error)
         end if
 
         jtmp = 0.
+        call mpi_scatter(jmean, size(jmean(:,:,zi:zf)), mpi_double_precision, jtmp(:,:,zi:zf), size(jtmp(:,:,zi:zf)), &
+                         mpi_double_precision, 0, new_comm, error)
 
-        if(id == 0)then
-            do i = 1, numproc-1
-                lo = i*size_z+1
-                hi = lo + size_z-1
-                call mpi_send(jmean(:, :, lo:hi), size(jmean(:, :,lo:hi)), mpi_double_precision, i, tag, new_comm, error)
-            end do
-            jtmp(:,:,zi:zf) = jmean(:,:,zi:zf)
-        else
-            call mpi_recv(jtmp(:,:, zi:zf), size(jtmp(:,:,zi:zf)), mpi_double_precision, 0, tag, new_comm, recv_status, error)
-        end if
-
-
+        time = 0.
         o = int(.1/delt)
         if(id == 0)print*,o,counter
-        lo = o /10
+        lo = o /100
         do p = 1, o
-            if(mod(p, lo) == 0 .and. id == 0) write(*,FMT="(A8,t21)",ADVANCE="NO") achar(13)//str(real(p)/real(o)*100., 5)//' %'
+            if(mod(p,lo) == 0 .and. id == 0) write(*,FMT="(A8,t21)") achar(13)//str(real(p)/real(o)*100., 5)//' %'
 
             do k = zi, zf
                 do j = yi, yf
@@ -145,8 +124,6 @@ subroutine heat_sim_3D(jmean, tissue, temp, numpoints, flag, id, numproc, error,
                 end do
             end do
 
-            call mpi_barrier(new_comm, error)
-
             !send_recv data to right
             call MPI_Sendrecv(t0(:,:,zf), size(t0(:,:,zf)), mpi_double_precision, right, tag, &
                               t0(:,:,zf+1), size(t0(:,:,zf+1)), mpi_double_precision, right, tag, &
@@ -157,28 +134,19 @@ subroutine heat_sim_3D(jmean, tissue, temp, numpoints, flag, id, numproc, error,
                               t0(:,:,zi-1), size(t0(:,:,zi-1)), mpi_double_precision, left, tag, &
                               new_comm, recv_status, error)
 
-            call mpi_barrier(new_comm, error)
-
             time = time + delt
-           call Arrhenius(t0, delt, tissue, zi, zf, numpoints)
+           call Arrhenius(t0, time, tissue, zi, zf, numpoints)
 
         end do
 
+        call mpi_gather(t0(:,:,zi:zf), size(t0(:,:,zi:zf)), mpi_double_precision, temp, size(temp(:,:,zi:zf)),&
+                        mpi_double_precision, 0, new_comm, error)
+
         !send data to master process and do I/O
         if(id == 0)then
-            print*,
-            do i = 1, numproc-1
-                lo = i*size_z+1
-                hi = lo + size_z-1
-                call mpi_recv(temp(:,:, lo:hi), size(temp(:,:,lo:hi)), mpi_double_precision, i, tag, new_comm, recv_status, error)
-            end do
-            temp(:,:,zi-1:zf) = t0(:,:,zi-1:zf)
-
             open(newunit=u,file='temp-'//str(counter)//'.dat',access='stream',form='unformatted',status='replace')
             write(u)temp
             close(u)
-        else
-            call mpi_send(t0(:, :, zi:zf), size(t0(:, :,zi:zf)), mpi_double_precision, 0, tag, new_comm, error)
         end if
 
 
@@ -215,7 +183,6 @@ subroutine heat_sim_3D(jmean, tissue, temp, numpoints, flag, id, numproc, error,
                 do x = 1, numpoints
                     if(temp(x, y, z) >= 44)then
                         tissue(x, y, z) = tissue(x, y, z) + delt*A*exp(-G/(R*(temp(x,y,z)+273)))
-                        ! print*,tissue(x, y, z)
                     end if
                 end do
             end do

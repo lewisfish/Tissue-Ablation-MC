@@ -21,12 +21,11 @@ use utils
 
 implicit none
 
-integer          :: nphotons,iseed,j,xcell,ycell,zcell, N, counter, u, i
+integer          :: nphotons,iseed,j,xcell,ycell,zcell, N, counter, u
 logical          :: tflag, flag, end
 DOUBLE PRECISION :: nscatt, nscattGLOBAL
 real             :: xmax,ymax,zmax, ran,delta, start, finish, ran2
 real, allocatable :: tissue(:,:,:), temp(:,:,:), tissueGLOBAL(:,:,:)
-character(len=3) :: fn
 
 ! mpi variables
 integer :: new_comm, error, right, left, id, numproc, dims(2), ndims, tag, recv_status(mpi_status_size), comm
@@ -99,12 +98,11 @@ call gridset(xmax, ymax, zmax, id)
 !***** for roundoff effects when crossing cell walls
 delta = 1.e-8*(2.*zmax/nzg)
 nscatt = 0
-
+call MPI_Barrier(MPI_COMM_WORLD, error)
 call cpu_time(start)
 flag = .true.
 end = .true.
 !loop over photons 
-call MPI_Barrier(MPI_COMM_WORLD, error)
 print*,'Photons now running on core: ',id
 
 
@@ -145,16 +143,13 @@ do while(end)
 
    end do      ! end loop over nph photons
    call MPI_REDUCE(jmean, jmeanGLOBAL, (nxg*nyg*nzg),MPI_DOUBLE_PRECISION, MPI_SUM,0,new_comm,error)
-   call MPI_BARRIER(MPI_COMM_WORLD, error)
 
    if(id==0)jmeanGLOBAL = jmeanGLOBAL * (1./(nphotons*numproc*(2.*xmax/nxg)*(2.*ymax/nyg)*(2.*zmax/nzg)))
 call heat_sim_3d(jmeanGLOBAL, tissue, temp, N, flag, id, numproc, error, new_comm, tag, recv_status, right, left, counter)
 
    counter = counter + 1
-   if(counter == 10)end = .false.
+   if(counter == 1)end = .false.
 
-
-   call MPI_BARRIER(MPI_COMM_WORLD, error)
    
    if(id == 0)then
       where(tissue> 1000)
@@ -171,7 +166,7 @@ call heat_sim_3d(jmeanGLOBAL, tissue, temp, N, flag, id, numproc, error, new_com
    if(.not. end)exit
    jmean = 0.
 end do
-
+call MPI_Barrier(new_comm, error)
 call cpu_time(finish)
 if(finish-start.ge.60.)then
  print*,floor((finish-start)/60.)+mod(finish-start,60.)/100.
@@ -180,11 +175,8 @@ else
 end if
 
 call MPI_REDUCE(jmean, jmeanGLOBAL, (nxg*nyg*nzg),MPI_DOUBLE_PRECISION, MPI_SUM,0,new_comm,error)
-call MPI_BARRIER(MPI_COMM_WORLD, error)
-
 
 call MPI_REDUCE(nscatt,nscattGLOBAL,1,MPI_DOUBLE_PRECISION,MPI_SUM,0,new_comm,error)
-call MPI_BARRIER(MPI_COMM_WORLD, error)
 
 if(id == 0)then
    print*,'Average # of scatters per photon:',(nscattGLOBAL/(nphotons*numproc))
@@ -192,8 +184,6 @@ if(id == 0)then
    call writer(xmax, ymax, zmax, nphotons, numproc)
    print*,'write done'
 end if
-
-call MPI_BARRIER(MPI_COMM_WORLD, error)
 
 call MPI_Finalize(error)
 end program mcpolar

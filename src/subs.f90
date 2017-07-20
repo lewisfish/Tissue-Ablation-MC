@@ -10,48 +10,48 @@ CONTAINS
 !   
    use constants,only : cwd,homedir,fileplace,resdir
    
-!#ifdef intel
-!   use ifport
-!#endif
+#ifdef intel
+  use ifport
+#endif
    
    implicit none
 
    integer :: io
 
    !get current working directory
-!#ifdef intel
-!   io = getcwd(cwd)
-!#else
+#ifdef intel
+  io = getcwd(cwd)
+#else
    CALL getcwd(cwd)
-!#endif
+#endif
 
    !get 'home' dir from cwd
    homedir=trim(cwd(1:len(trim(cwd))-3))
    !get data dir
    fileplace=trim(homedir)//'data/'
    !checks to see if data folder exists, if not creates it.
-!#ifdef intel
-!   io = chdir(fileplace)
-!#else
+#ifdef intel
+  io = chdir(fileplace)
+#else
    call chdir(fileplace,io)
-!#endif
+#endif
    if(io.ne.0)then
       print*,'data directory does not exist...'
       print*, 'creating directory...'
-!#ifdef intel
-!      io = system("mkdir "//fileplace)
-!      io = chdir(fileplace)
-!      io = system("mkdir jmean/")
-!      io = system("mkdir deposit/")
-!      io = system("mkdir im/")
-!#else
+#ifdef intel
+     io = system("mkdir "//fileplace)
+     io = chdir(fileplace)
+     io = system("mkdir jmean/")
+     io = system("mkdir deposit/")
+     io = system("mkdir im/")
+#else
       call system("mkdir "//trim(fileplace)) !dosent work with spaces :(
       call chdir(trim(fileplace),io)
       call system("mkdir jmean/")
       call system("mkdir deposit/")
       call system("mkdir im/")
       print*, 'created directory ',trim(fileplace)
-!#endif
+#endif
    end if
    
    !get res dir
