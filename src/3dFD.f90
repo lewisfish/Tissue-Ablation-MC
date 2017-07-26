@@ -23,10 +23,10 @@ subroutine heat_sim_3D(jmean, tissue, temp, numpoints, flag, id, numproc, error,
 
         !heat variables
         real              :: u_xx, u_yy, u_zz, delt, time, k0, hx, hy, hz, hx2, hy2, hz2
-        real              :: rho, kappa, c_heat
+        real              :: rho, kappa, c_heat, laserOn, pulselength, repetitionRate_1, pulseCount, repetitionCount
         real, allocatable :: T0(:,:,:), jtmp(:,:,:)
         integer           :: i, j, k, p, u, size_x, size_y, size_z, xi, yi, zi, xf, yf, zf, lo, hi, N, o
-
+        logical :: laser_flag
 
         if(id == 0)then
             !do decomp
@@ -41,9 +41,6 @@ subroutine heat_sim_3D(jmean, tissue, temp, numpoints, flag, id, numproc, error,
 
         !send N to all processes
         call MPI_Bcast(N, 1, MPI_integer ,0 , new_comm, error)
-
-        ! call MPI_Bcast(jmean, size(jmean), MPI_real ,0 , new_comm, error)
-
 
         !init heat variables
         kappa = 0.0056 ! W/cm C
@@ -107,10 +104,17 @@ subroutine heat_sim_3D(jmean, tissue, temp, numpoints, flag, id, numproc, error,
                          mpi_double_precision, 0, new_comm, error)
 
         time = 0.
-        o = int(.1/delt)
+        laserOn = 1.
+        pulselength = 200.d-3
+        repetitionRate_1 = 2./5.
+        pulseCount = 0.
+        repetitionCount = 0.
+        laser_flag = .true.
+        o = int(1./delt)
         if(id == 0)print*,o,counter
         lo = o /100
         do p = 1, o
+            
             if(mod(p,lo) == 0 .and. id == 0) write(*,FMT="(A8,t21)") achar(13)//str(real(p)/real(o)*100., 5)//' %'
 
             do k = zi, zf
@@ -119,7 +123,7 @@ subroutine heat_sim_3D(jmean, tissue, temp, numpoints, flag, id, numproc, error,
                         u_xx = (t0(i+1, j,   k)   - 2.*t0(i,j,k) + t0(i-1, j,   k))  * hx2
                         u_yy = (t0(i,   j+1, k)   - 2.*t0(i,j,k) + t0(i,   j-1, k))  * hy2
                         u_zz = (t0(i,   j,   k+1) - 2.*t0(i,j,k) + t0(i,   j,   k-1))* hz2
-                        t0(i,j,k) = t0(i,j,k) + k0*delt*(u_xx + u_yy + u_zz) + k0*delt*jtmp(i,j,k)/rho
+                        t0(i,j,k) = t0(i,j,k) + k0*delt*(u_xx + u_yy + u_zz) + laserOn*k0*delt*jtmp(i,j,k)/rho
                     end do
                 end do
             end do
@@ -135,6 +139,25 @@ subroutine heat_sim_3D(jmean, tissue, temp, numpoints, flag, id, numproc, error,
                               new_comm, recv_status, error)
 
             time = time + delt
+            pulseCount = pulseCount + delt
+            repetitionCount = repetitionCount + delt
+            if(pulseCount >= pulselength .and. laserOn > 0.)then
+                pulseCount = 0.
+                laserOn = 0.
+                if(laser_flag)then
+                    laser_flag = .false.
+                    if(id==0)print*,'off'
+                end if
+            end if
+            if(repetitionCount >= repetitionRate_1)then
+                pulseCount = 0.
+                repetitionCount = 0.
+                laserOn = 1.
+                if(.not.laser_flag)then
+                    laser_flag = .true.
+                    if(id==0)print*,'on'
+                end if
+            end if
            call Arrhenius(t0, time, tissue, zi, zf, numpoints)
 
         end do
@@ -142,22 +165,21 @@ subroutine heat_sim_3D(jmean, tissue, temp, numpoints, flag, id, numproc, error,
         call mpi_gather(t0(:,:,zi:zf), size(t0(:,:,zi:zf)), mpi_double_precision, temp, size(temp(:,:,zi:zf)),&
                         mpi_double_precision, 0, new_comm, error)
 
+        jtmp = tissue
+
+        call mpi_gather(tissue(:,:,zi:zf), size(tissue(:,:,zi:zf)), mpi_double_precision, jtmp, size(jtmp(:,:,zi:zf)),&
+                mpi_double_precision, 0, new_comm, error)
+
+        tissue = jtmp
+
         !send data to master process and do I/O
         if(id == 0)then
             open(newunit=u,file='temp-'//str(counter)//'.dat',access='stream',form='unformatted',status='replace')
             write(u)temp
             close(u)
-        end if
-
-
-        if(id == 0)then
-            do i = 1, numproc-1
-                lo = i*size_z+1
-                hi = lo + size_z-1
-            call mpi_recv(tissue(:,:, lo:hi), size(tissue(:,:,lo:hi)), mpi_double_precision, i, tag, new_comm, recv_status, error)
-            end do
-        else
-            call mpi_send(tissue(:, :, zi:zf), size(tissue(:, :,zi:zf)), mpi_double_precision, 0, tag, new_comm, error)
+            open(newunit=u,file='tissue-'//str(counter)//'.dat',access='stream',form='unformatted',status='replace')
+            write(u)tissue
+            close(u)
         end if
 
         deallocate(t0, jtmp)

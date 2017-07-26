@@ -38,7 +38,7 @@ call directory
 call alloc_array
 call zarray
 
-N = 200 ! points for heat sim
+N = 104 ! points for heat sim
 allocate(tissue(nxg, nyg, nzg), tissueGLOBAL(nxg,nyg,nzg))
 allocate(temp(0:N+1, 0:N+1, 0:N+1))
 
@@ -144,20 +144,20 @@ do while(end)
    end do      ! end loop over nph photons
    call MPI_REDUCE(jmean, jmeanGLOBAL, (nxg*nyg*nzg),MPI_DOUBLE_PRECISION, MPI_SUM,0,new_comm,error)
 
-   if(id==0)jmeanGLOBAL = jmeanGLOBAL * (1./(nphotons*numproc*(2.*xmax/nxg)*(2.*ymax/nyg)*(2.*zmax/nzg)))
+   if(id==0)jmeanGLOBAL = jmeanGLOBAL * (100./(nphotons*numproc*(2.*xmax/nxg)*(2.*ymax/nyg)*(2.*zmax/nzg)))
 call heat_sim_3d(jmeanGLOBAL, tissue, temp, N, flag, id, numproc, error, new_comm, tag, recv_status, right, left, counter)
 
    counter = counter + 1
-   if(counter == 1)end = .false.
+   if(counter == 5)end = .false.
 
    
-   if(id == 0)then
-      where(tissue> 1000)
+   ! if(id == 0)then
+      where(tissue > 1000)
             rhokap = 0.
       end where
-   end if
+   ! end if
 
-   call MPI_Bcast(rhokap, size(rhokap), MPI_DOUBLE_PRECISION ,0 , new_comm, error)
+   ! call MPI_Bcast(rhokap, size(rhokap), MPI_DOUBLE_PRECISION ,0 , new_comm, error)
 
    if(id == 0)then
       open(newunit=u,file=trim(fileplace)//'jmean/rhokap-'//str(counter)//'.dat',access='stream',form='unformatted')
