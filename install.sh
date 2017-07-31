@@ -10,6 +10,7 @@ function showhelp
   echo '   -n, --cores           Compiles and run code on n cores. Default is 1 core.'
   echo '   -d, --debug           Compiles and runs code with debug flags on n core.'
   echo '   -m, --make            Compiles the code with warning enabled.'
+  echo '   -c, --complier        Select complier. gnu or intel.'
 
 }
 
