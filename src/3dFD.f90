@@ -109,13 +109,18 @@ subroutine heat_sim_3D(jmean, tissue, temp, numpoints, flag, id, numproc, new_co
 
         time = 0.
         laserOn = 1.
-        pulselength = 200.d-3
-        repetitionRate_1 = 2./5.
+        pulselength = 200.d-5
+        repetitionRate_1 = 0.01
+
+        if(pulselength < delt)then
+            if(id==0)print*,"pulselength smaller than timestep, adjusting..."
+            delt = pulselength / 2.
+        end if
+
         pulseCount = 0.
         repetitionCount = 0.
         laser_flag = .true.
         o = int(1./delt)
-        if(id == 0)print*,o,counter
         lo = o / 100
         do p = 1, o
             
