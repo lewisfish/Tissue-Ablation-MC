@@ -1,6 +1,6 @@
 program mcpolar
 
-use mpi
+use mpi_f08
 
 !shared data
 use constants
@@ -21,15 +21,18 @@ use utils
 
 implicit none
 
-integer          :: nphotons,iseed,j,xcell,ycell,zcell, N, counter, u
-logical          :: tflag, flag, end
-DOUBLE PRECISION :: nscatt, nscattGLOBAL
-real             :: xmax,ymax,zmax, ran,delta, start, finish, ran2
+integer           :: nphotons ,iseed, j, xcell, ycell, zcell, N, counter, u
+logical           :: tflag, flag, end
+double precision  :: nscatt, nscattGLOBAL
+real              :: xmax, ymax, zmax, ran, delta, start, finish, ran2
 real, allocatable :: tissue(:,:,:), temp(:,:,:), tissueGLOBAL(:,:,:)
 
 ! mpi variables
-integer :: new_comm, error, right, left, id, numproc, dims(2), ndims, tag, recv_status(mpi_status_size), comm
-logical :: periods(1), reorder
+type(mpi_comm)   :: comm, new_comm
+type(MPI_Status) :: recv_status
+integer          :: right, left, id, numproc, dims(2), ndims, tag
+logical          :: periods(1), reorder
+call MPI_init()
 
 !set directory paths
 call directory
@@ -38,33 +41,32 @@ call directory
 call alloc_array
 call zarray
 
-N = 104 ! points for heat sim
+N = 56 ! points for heat sim
 allocate(tissue(nxg, nyg, nzg), tissueGLOBAL(nxg,nyg,nzg))
 allocate(temp(0:N+1, 0:N+1, 0:N+1))
 
-temp = 0.
-tissue = 0.
+temp    = 0.
+tissue  = 0.
 counter = 0
-comm = MPI_COMM_WORLD
+comm    = MPI_COMM_WORLD
 
-call MPI_init(error)
 
-call MPI_Comm_size(comm, numproc, error)
+call MPI_Comm_size(comm, numproc)
 
 !setup topology variables
-tag = 1
-dims = 0
+tag     = 1
+dims    = 0
 periods = .false.
 reorder = .true.
-ndims = 1
+ndims   = 1
 
 !create cartesian topology on cpu
-call mpi_dims_create(numproc, ndims, dims, error)
-call mpi_cart_create(comm, ndims, dims, periods, reorder, new_comm, error)
-call mpi_comm_rank(new_comm, id, error)
+call mpi_dims_create(numproc, ndims, dims)
+call mpi_cart_create(comm, ndims, dims, periods, reorder, new_comm)
+call mpi_comm_rank(new_comm, id)
 
 !get neighbours
-call mpi_cart_shift(new_comm, 0, 1, left, right, error)
+call mpi_cart_shift(new_comm, 0, 1, left, right)
 
 !**** Read in parameters from the file input.params
 open(10,file=trim(resdir)//'input.params',status='old')
@@ -77,13 +79,13 @@ open(10,file=trim(resdir)//'input.params',status='old')
    close(10)
 
 ! set seed for rnd generator. id to change seed for each process
-iseed=-95648324+id
+iseed = -95648324 + id
 
 !****** setup up arrays and bin numbers/dimensions
 
 !***** Set up constants, pi and 2*pi  ********************************
 
-iseed=-abs(iseed)  ! Random number seed must be negative for ran2
+iseed = -abs(iseed)  ! Random number seed must be negative for ran2
 
 call init_opt1
 
@@ -96,9 +98,9 @@ end if
 call gridset(xmax, ymax, zmax, id)
 !***** Set small distance for use in optical depth integration routines 
 !***** for roundoff effects when crossing cell walls
-delta = 1.e-8*(2.*zmax/nzg)
+delta  = 1.e-8*(2.*zmax/nzg)
 nscatt = 0
-call MPI_Barrier(MPI_COMM_WORLD, error)
+call MPI_Barrier(MPI_COMM_WORLD)
 call cpu_time(start)
 flag = .true.
 end = .true.
@@ -142,10 +144,10 @@ do while(end)
 
 
    end do      ! end loop over nph photons
-   call MPI_REDUCE(jmean, jmeanGLOBAL, (nxg*nyg*nzg),MPI_DOUBLE_PRECISION, MPI_SUM,0,new_comm,error)
+   call MPI_REDUCE(jmean, jmeanGLOBAL, (nxg*nyg*nzg),MPI_DOUBLE_PRECISION, MPI_SUM,0,new_comm)
 
    if(id==0)jmeanGLOBAL = jmeanGLOBAL * (100./(nphotons*numproc*(2.*xmax/nxg)*(2.*ymax/nyg)*(2.*zmax/nzg)))
-call heat_sim_3d(jmeanGLOBAL, tissue, temp, N, flag, id, numproc, error, new_comm, tag, recv_status, right, left, counter)
+call heat_sim_3d(jmeanGLOBAL, tissue, temp, N, flag, id, numproc, new_comm, tag, recv_status, right, left, counter)
 
    counter = counter + 1
    if(counter == 5)end = .false.
@@ -157,7 +159,7 @@ call heat_sim_3d(jmeanGLOBAL, tissue, temp, N, flag, id, numproc, error, new_com
       end where
    ! end if
 
-   ! call MPI_Bcast(rhokap, size(rhokap), MPI_DOUBLE_PRECISION ,0 , new_comm, error)
+   ! call MPI_Bcast(rhokap, size(rhokap), MPI_DOUBLE_PRECISION ,0 , new_comm)
 
    if(id == 0)then
       open(newunit=u,file=trim(fileplace)//'jmean/rhokap-'//str(counter)//'.dat',access='stream',form='unformatted')
@@ -166,24 +168,24 @@ call heat_sim_3d(jmeanGLOBAL, tissue, temp, N, flag, id, numproc, error, new_com
    if(.not. end)exit
    jmean = 0.
 end do
-call MPI_Barrier(new_comm, error)
+
+
 call cpu_time(finish)
 if(finish-start.ge.60.)then
- print*,floor((finish-start)/60.)+mod(finish-start,60.)/100.
+    print*,floor((finish-start)/60.)+mod(finish-start,60.)/100.
 else
-      print*, 'time taken ~',floor(finish-start/60.),'s'
+    print*, 'time taken ~',floor(finish-start/60.),'s'
 end if
 
-call MPI_REDUCE(jmean, jmeanGLOBAL, (nxg*nyg*nzg),MPI_DOUBLE_PRECISION, MPI_SUM,0,new_comm,error)
+call mpi_reduce(jmean, jmeanGLOBAL, (nxg*nyg*nzg),MPI_DOUBLE_PRECISION, MPI_SUM,0,new_comm)
 
-call MPI_REDUCE(nscatt,nscattGLOBAL,1,MPI_DOUBLE_PRECISION,MPI_SUM,0,new_comm,error)
+call mpi_reduce(nscatt,nscattGLOBAL,1,MPI_DOUBLE_PRECISION,MPI_SUM,0,new_comm)
 
 if(id == 0)then
    print*,'Average # of scatters per photon:',(nscattGLOBAL/(nphotons*numproc))
-   !write out files
    call writer(xmax, ymax, zmax, nphotons, numproc)
    print*,'write done'
 end if
 
-call MPI_Finalize(error)
+call MPI_Finalize()
 end program mcpolar

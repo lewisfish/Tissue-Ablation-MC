@@ -53,7 +53,9 @@ CONTAINS
       offx = .5
    case(800001:900000)!top right
       offy = -.5
-      offx = .5      
+      offx = .5
+   case default
+      stop "error, undefined photon number..."     
    end select  
 
 

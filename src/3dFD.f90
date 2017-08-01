@@ -7,9 +7,9 @@ Module Heat
 
     contains
 
-subroutine heat_sim_3D(jmean, tissue, temp, numpoints, flag, id, numproc, error, new_comm, tag, recv_status, right, left,counter)
+subroutine heat_sim_3D(jmean, tissue, temp, numpoints, flag, id, numproc, new_comm, tag, recv_status, right, left,counter)
 
-        use mpi
+        use mpi_f08
         use utils, only : str
 
         implicit none
@@ -19,20 +19,22 @@ subroutine heat_sim_3D(jmean, tissue, temp, numpoints, flag, id, numproc, error,
         real,    intent(INOUT) :: tissue(:,:,:), temp(0:numpoints+1,0:numpoints+1,0:numpoints+1)
         logical, intent(INOUT) :: flag
 
-        integer :: new_comm, error, right, left, id, numproc, recv_status(mpi_status_size), tag,counter
+        type(mpi_comm)   :: new_comm
+        type(MPI_Status) :: recv_status
+        integer          :: right, left, id, numproc,  tag,counter
 
         !heat variables
-        real              :: u_xx, u_yy, u_zz, delt, time, k0, hx, hy, hz, hx2, hy2, hz2
+        real              :: u_xx, u_yy, u_zz, delt, time, k0, k0t, k0m, hx, hy, hz, hx2, hy2, hz2
         real              :: rho, kappa, c_heat, laserOn, pulselength, repetitionRate_1, pulseCount, repetitionCount
         real, allocatable :: T0(:,:,:), jtmp(:,:,:)
-        integer           :: i, j, k, p, u, size_x, size_y, size_z, xi, yi, zi, xf, yf, zf, lo, hi, N, o
+        integer           :: i, j, k, p, u, size_x, size_y, size_z, xi, yi, zi, xf, yf, zf, lo, N, o
         logical :: laser_flag
 
         if(id == 0)then
             !do decomp
             if(mod(numpoints,numproc) /= 0)then
                 print('(I2.1,a,I2.1)'),numpoints,' not divisable by : ', numproc
-                call mpi_finalize(error)
+                call mpi_finalize()
                 error stop
             else
                 N = numpoints / numproc
@@ -40,7 +42,7 @@ subroutine heat_sim_3D(jmean, tissue, temp, numpoints, flag, id, numproc, error,
         end if
 
         !send N to all processes
-        call MPI_Bcast(N, 1, MPI_integer ,0 , new_comm, error)
+        call MPI_Bcast(N, 1, MPI_integer ,0 , new_comm)
 
         !init heat variables
         kappa = 0.0056 ! W/cm C
@@ -68,7 +70,9 @@ subroutine heat_sim_3D(jmean, tissue, temp, numpoints, flag, id, numproc, error,
         hz2 = 1./hz**2.
 
         delt = 0.125 * (min(hx,hy,hz)**3)/k0
-        
+        k0t = k0 * delt
+        k0m = k0t/kappa
+
         xi = 1 
         xf = size_x
 
@@ -96,12 +100,12 @@ subroutine heat_sim_3D(jmean, tissue, temp, numpoints, flag, id, numproc, error,
             flag = .false.
         else
             call mpi_scatter(temp, size(temp(:,:,zi:zf)), mpi_double_precision, t0(:,:,zi:zf), size(t0(:,:,zi:zf)), &
-                             mpi_double_precision, 0, new_comm, error)
+                             mpi_double_precision, 0, new_comm)
         end if
 
         jtmp = 0.
         call mpi_scatter(jmean, size(jmean(:,:,zi:zf)), mpi_double_precision, jtmp(:,:,zi:zf), size(jtmp(:,:,zi:zf)), &
-                         mpi_double_precision, 0, new_comm, error)
+                         mpi_double_precision, 0, new_comm)
 
         time = 0.
         laserOn = 1.
@@ -112,7 +116,7 @@ subroutine heat_sim_3D(jmean, tissue, temp, numpoints, flag, id, numproc, error,
         laser_flag = .true.
         o = int(1./delt)
         if(id == 0)print*,o,counter
-        lo = o /100
+        lo = o / 100
         do p = 1, o
             
             if(mod(p,lo) == 0 .and. id == 0) write(*,FMT="(A8,t21)") achar(13)//str(real(p)/real(o)*100., 5)//' %'
@@ -123,7 +127,8 @@ subroutine heat_sim_3D(jmean, tissue, temp, numpoints, flag, id, numproc, error,
                         u_xx = (t0(i+1, j,   k)   - 2.*t0(i,j,k) + t0(i-1, j,   k))  * hx2
                         u_yy = (t0(i,   j+1, k)   - 2.*t0(i,j,k) + t0(i,   j-1, k))  * hy2
                         u_zz = (t0(i,   j,   k+1) - 2.*t0(i,j,k) + t0(i,   j,   k-1))* hz2
-                        t0(i,j,k) = t0(i,j,k) + k0*delt*(u_xx + u_yy + u_zz) + laserOn*k0*delt*jtmp(i,j,k)/rho
+                        t0(i,j,k) = t0(i,j,k) + k0t*(u_xx + u_yy + u_zz) + laserOn*k0m*jtmp(i,j,k)
+                        !above might be /kappa inplace of /rho...
                     end do
                 end do
             end do
@@ -131,12 +136,12 @@ subroutine heat_sim_3D(jmean, tissue, temp, numpoints, flag, id, numproc, error,
             !send_recv data to right
             call MPI_Sendrecv(t0(:,:,zf), size(t0(:,:,zf)), mpi_double_precision, right, tag, &
                               t0(:,:,zf+1), size(t0(:,:,zf+1)), mpi_double_precision, right, tag, &
-                              new_comm, recv_status, error)
+                              new_comm, recv_status)
             
             !send_recv data to left
             call MPI_Sendrecv(t0(:,:,zi), size(t0(:,:,zi)), mpi_double_precision, left, tag, &
                               t0(:,:,zi-1), size(t0(:,:,zi-1)), mpi_double_precision, left, tag, &
-                              new_comm, recv_status, error)
+                              new_comm, recv_status)
 
             time = time + delt
             pulseCount = pulseCount + delt
@@ -163,12 +168,12 @@ subroutine heat_sim_3D(jmean, tissue, temp, numpoints, flag, id, numproc, error,
         end do
 
         call mpi_gather(t0(:,:,zi:zf), size(t0(:,:,zi:zf)), mpi_double_precision, temp, size(temp(:,:,zi:zf)),&
-                        mpi_double_precision, 0, new_comm, error)
+                        mpi_double_precision, 0, new_comm)
 
         jtmp = tissue
 
         call mpi_gather(tissue(:,:,zi:zf), size(tissue(:,:,zi:zf)), mpi_double_precision, jtmp, size(jtmp(:,:,zi:zf)),&
-                mpi_double_precision, 0, new_comm, error)
+                mpi_double_precision, 0, new_comm)
 
         tissue = jtmp
 
@@ -209,6 +214,5 @@ subroutine heat_sim_3D(jmean, tissue, temp, numpoints, flag, id, numproc, error,
                 end do
             end do
         end do
-
     end subroutine  Arrhenius
 end Module Heat
