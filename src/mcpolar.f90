@@ -21,7 +21,7 @@ use utils
 
 implicit none
 
-integer           :: nphotons ,iseed, j, xcell, ycell, zcell, N, counter, u
+integer           :: nphotons ,iseed, j, xcell, ycell, zcell, N, counter, u, iters
 logical           :: tflag, flag, end
 double precision  :: nscatt, nscattGLOBAL
 real              :: xmax, ymax, zmax, ran, delta, start, finish, ran2
@@ -41,7 +41,7 @@ call directory
 call alloc_array
 call zarray
 
-N = 56 ! points for heat sim
+N = 104 ! points for heat sim
 allocate(tissue(nxg, nyg, nzg), tissueGLOBAL(nxg,nyg,nzg))
 allocate(temp(0:N+1, 0:N+1, 0:N+1))
 
@@ -69,14 +69,15 @@ call mpi_comm_rank(new_comm, id)
 call mpi_cart_shift(new_comm, 0, 1, left, right)
 
 !**** Read in parameters from the file input.params
-open(10,file=trim(resdir)//'input.params',status='old')
-   read(10,*) nphotons
-   read(10,*) xmax
-   read(10,*) ymax
-   read(10,*) zmax
-   read(10,*) n1
-   read(10,*) n2
-   close(10)
+open(newunit=u,file=trim(resdir)//'input.params',status='old')
+   read(u,*) nphotons
+   read(u,*) xmax
+   read(u,*) ymax
+   read(u,*) zmax
+   read(u,*) n1
+   read(u,*) n2
+   read(u,*) iters
+   close(u)
 
 ! set seed for rnd generator. id to change seed for each process
 iseed = -95648324 + id
@@ -143,16 +144,17 @@ do while(end)
    end do      ! end loop over nph photons
    call MPI_REDUCE(jmean, jmeanGLOBAL, (nxg*nyg*nzg),MPI_DOUBLE_PRECISION, MPI_SUM,0,new_comm)
 
-   if(id==0)jmeanGLOBAL = jmeanGLOBAL * (100./(nphotons*numproc*(2.*xmax/nxg)*(2.*ymax/nyg)*(2.*zmax/nzg)))
+   if(id==0)jmeanGLOBAL = jmeanGLOBAL * (50./(nphotons*numproc*(2.*xmax/nxg)*(2.*ymax/nyg)*(2.*zmax/nzg)))
+   if(id==0)print*,counter
 call heat_sim_3d(jmeanGLOBAL, tissue, temp, N, flag, id, numproc, new_comm, tag, recv_status, right, left, counter)
 
    counter = counter + 1
-   if(counter == 5)end = .false.
+   if(counter == iters)end = .false.
 
    
    ! if(id == 0)then
-      where(tissue > 1000)
-            rhokap = 0.
+      where(tissue >= 3.)
+         rhokap = 0.  
       end where
    ! end if
 
