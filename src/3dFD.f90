@@ -24,11 +24,11 @@ subroutine heat_sim_3D(jmean, tissue, temp, numpoints, flag, id, numproc, new_co
         integer          :: right, left, id, numproc,  tag,counter
 
         !heat variables
-        real              :: u_xx, u_yy, u_zz, delt, time, alpha, k0ts, k0ms, k0ta, k0ma, dx, dy, dz, dx2, dy2, dz2
+        real              :: u_xx, u_yy, u_zz, delt, time, alpha, k0ts, k0ms, k0ta, k0ma, dx, dy, dz
         real              :: rho, kappa, c_heat, laserOn, pulselength, repetitionRate_1, pulseCount, repetitionCount
         real              :: betax, gammax, betay, gammay, betaz, gammaz, h, t_air, t_air4, rx, ry, rz, eps, sigma, eta
         real              :: tim_fin, tim_srt, coeff
-        real, allocatable :: T0(:,:,:), jtmp(:,:,:), coeff1(:,:,:), coeff2(:,:,:)
+        real, allocatable :: T0(:,:,:), jtmp(:,:,:)
         integer           :: i, j, k, p, u, size_x, size_y, size_z, xi, yi, zi, xf, yf, zf, lo, N, o
         logical :: laser_flag
 
@@ -45,8 +45,6 @@ subroutine heat_sim_3D(jmean, tissue, temp, numpoints, flag, id, numproc, new_co
 
         !send N to all processes
         call MPI_Bcast(N, 1, MPI_integer ,0 , new_comm)
-
-        allocate(coeff1(numpoints,numpoints,numpoints), coeff2(numpoints,numpoints,numpoints))
 
         !init heat variables for medium
         kappa = 0.00209 !0.0056 ! W/cm K
@@ -73,14 +71,6 @@ subroutine heat_sim_3D(jmean, tissue, temp, numpoints, flag, id, numproc, new_co
         dy = 1. / (numpoints + 2)
         dz = 1. / (numpoints + 2)  
 
-        ! dx2 = 1./dx**2
-        ! dy2 = 1./dy**2.
-        ! dz2 = 1./dz**2.
-
-        ! delt = 0.125 * (min(dx,dy,dz)**3)/alpha
-        ! k0ts = alpha * delt
-        ! k0ms = k0ts/kappa
-
         !init heat variables for air
         ! kappa = 0.0260e-2 ! W/cm C
         ! rho = 0.0012 ! g/cm^3
@@ -88,30 +78,6 @@ subroutine heat_sim_3D(jmean, tissue, temp, numpoints, flag, id, numproc, new_co
 
         ! rho = rho/1000.
         ! c_heat = c_heat*1000.
-
-        ! alpha = kappa / (rho * c_heat)
-        coeff = alpha*delt/kappa
-        ! k0ta = alpha * delt
-        ! k0ma = k0ta/kappa
-
-        ! where(tissue < 3.)
-        !     coeff1 = k0ts
-        !     coeff2 = k0ms
-        ! elsewhere
-        !     coeff1 = k0ta
-        !     coeff2 = k0ma
-        ! end where
-
-        ! if(id==0)then
-        !     open(newunit=u,file=str(counter)//'coeff1.dat',access='stream',form='unformatted')
-        !     write(u)coeff1
-        !     close(u)
-        !     open(newunit=u,file=str(counter)//'coeff2.dat',access='stream',form='unformatted')
-        !     write(u)coeff2
-        !     close(u)
-
-        ! end if
-        ! call mpi_barrier(new_comm)
 
         xi = 1 
         xf = size_x
@@ -137,26 +103,28 @@ subroutine heat_sim_3D(jmean, tissue, temp, numpoints, flag, id, numproc, new_co
         gammaz = dz*h*t_air/kappa
 
         eta = eps*sigma*dx*dy*betax
+        coeff = alpha*delt/kappa
 
         rx = alpha * delt/(dx**2) 
         ry = alpha * delt/(dy**2) 
         rz = alpha * delt/(dz**2) 
 
-        t0 = 0.
+        ! t0 = 37.
         if(flag)then
-            t0 = 37.
-            t0(xf+1,:,:) = 37.  ! side face
-            t0(xi-1,:,:) = 37.    ! side face
-            t0(:,yi-1,:) = 37. ! front face
-            t0(:,yf+1,:) = 37.  ! back face
-            if(id == numproc - 1)then
-                t0(:,:,zf+1) = 37.  ! bottom face
-            end if
-            if(id == 0)t0(:,:,zi-1) = 25.  ! top face 
+            ! t0(xf+1,:,:) = 37.  ! side face
+            ! t0(xi-1,:,:) = 37.    ! side face
+            ! t0(:,yi-1,:) = 37. ! front face
+            ! t0(:,yf+1,:) = 37.  ! back face
+            ! if(id == numproc - 1)then
+            !     t0(:,:,zf+1) = 37.  ! top face
+            ! end if
+            ! if(id == 0)t0(:,:,zi-1) = 37.  ! bottom face 
             flag = .false.
+            t0 = 37. + 273.
+            temp = 37. + 273.
         else
-            call mpi_scatter(temp, size(temp(:,:,zi:zf)), mpi_double_precision, t0(:,:,zi:zf), size(t0(:,:,zi:zf)), &
-                             mpi_double_precision, 0, new_comm)
+            call mpi_scatter(temp, size(temp(:,:,zi-1:zf+1)), mpi_double_precision, &
+                             t0(:,:,zi-1:zf+1), size(t0(:,:,zi-1:zf+1)), mpi_double_precision, 0, new_comm)
         end if
 
         jtmp = 0.
@@ -185,12 +153,12 @@ subroutine heat_sim_3D(jmean, tissue, temp, numpoints, flag, id, numproc, new_co
             if(mod(p,lo) == 0 .and. id == 0) write(*,FMT="(A8,t21)",advance='no') achar(13)//str(real(p)/real(o)*100., 5)//' %'
             if(p == 2 .and. id == 0)then
                 call cpu_time(tim_fin)
-                print*,(tim_fin-tim_srt)*o/60.
+                print*, 'est. time for loop ~ ',str((tim_fin-tim_srt)*o,2)//'s'
             end if
             do k = zi, zf
                 do j = yi, yf
                     do i = xi, xf
-                        if(k == zf)then
+                        if(k == zf .and. id == numproc-1)then!B.Cs
                         u_zz = (1.-2.*rz*betax) * t0(i,j,k) + (2. *rz * t0(i,j,k+1)) + (2. * rz * gammax) &
                                - 2.*rz*eta*(t0(i,j,k)**4-T_air4)
                         else
@@ -198,14 +166,7 @@ subroutine heat_sim_3D(jmean, tissue, temp, numpoints, flag, id, numproc, new_co
                         end if
                         u_yy = ry*t0(i, j - 1, k    ) + (1.-2.*ry) * t0(i, j, k) + ry*t0(i, j + 1, k)
                         u_xx = rx*t0(i - 1, j, k    ) + (1.-2.*rx) * t0(i, j, k) + rx*t0(i + 1, j, k)
-
                         t0(i,j,k) = (u_xx + u_yy + u_zz)/3. + laserOn*coeff*jtmp(i,j,k)
-                        !shouldnt be rx * everything...
-                        !u_xx = (t0(i+1, j,   k)   - 2.*t0(i,j,k) + t0(i-1, j,   k))  * dx2
-                        !u_yy = (t0(i,   j+1, k)   - 2.*t0(i,j,k) + t0(i,   j-1, k))  * dy2
-                        !u_zz = (t0(i,   j,   k+1) - 2.*t0(i,j,k) + t0(i,   j,   k-1))* dz2
-                        !t0(i,j,k) = t0(i,j,k) + coeff1(i,j,k)*(u_xx + u_yy + u_zz) + laserOn*coeff2(i,j,k)*jtmp(i,j,k)
-                        !above might be /kappa inplace of /rho...
                     end do
                 end do
             end do
@@ -249,8 +210,8 @@ subroutine heat_sim_3D(jmean, tissue, temp, numpoints, flag, id, numproc, new_co
 
         jtmp = tissue
 
-        call mpi_gather(tissue(xi:xf,yi:yf,zi:zf), size(tissue(:,:,zi:zf)), mpi_double_precision, jtmp, size(jtmp(:,:,zi:zf)),&
-                mpi_double_precision, 0, new_comm)
+        call mpi_gather(tissue(xi:xf,yi:yf,zi:zf), size(tissue(xi:xf,yi:yf,zi:zf)), mpi_double_precision, &
+                        jtmp, size(jtmp(xi:xf,yi:yf,zi:zf)), mpi_double_precision, 0, new_comm)
 
         tissue = jtmp
 

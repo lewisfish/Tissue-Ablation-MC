@@ -142,9 +142,9 @@ do while(end)
          call tauint1(xmax,ymax,zmax,xcell,ycell,zcell,tflag,iseed,delta)          
       end do
    end do      ! end loop over nph photons
-   call MPI_allREDUCE(jmean, jmeanGLOBAL, (nxg*nyg*nzg),MPI_DOUBLE_PRECISION, MPI_SUM,new_comm)
+   call MPI_REDUCE(jmean, jmeanGLOBAL, (nxg*nyg*nzg),MPI_DOUBLE_PRECISION, MPI_SUM,0,new_comm)
 
-   jmeanGLOBAL = jmeanGLOBAL * (1000./(nphotons*numproc*(2.*xmax/nxg)*(2.*ymax/nyg)*(2.*zmax/nzg)))
+   jmeanGLOBAL = jmeanGLOBAL * (1./(nphotons*numproc*(2.*xmax/nxg)*(2.*ymax/nyg)*(2.*zmax/nzg)))
    if(id==0)print*,counter
 call heat_sim_3d(jmeanGLOBAL, tissue, temp, N, flag, id, numproc, new_comm, tag, recv_status, right, left, counter)
 
@@ -168,10 +168,9 @@ call heat_sim_3d(jmeanGLOBAL, tissue, temp, N, flag, id, numproc, new_comm, tag,
    jmean = 0.
 end do
 
-
 call cpu_time(finish)
 if(finish-start.ge.60.)then
-    print*,floor((finish-start)/60.)+mod(finish-start,60.)/100.
+    print*,str(floor((finish-start)/60.)+mod(finish-start,60.)/100.,5)//' mins'
 else
     print*, 'time taken ~',floor(finish-start/60.),'s'
 end if
