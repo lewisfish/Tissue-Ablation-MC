@@ -137,12 +137,9 @@ do while(end)
             tflag = .true.
             exit
          end if
-
    !************ Find next scattering location
          call tauint1(xmax,ymax,zmax,xcell,ycell,zcell,tflag,iseed,delta)          
       end do
-
-
    end do      ! end loop over nph photons
    call MPI_REDUCE(jmean, jmeanGLOBAL, (nxg*nyg*nzg),MPI_DOUBLE_PRECISION, MPI_SUM,0,new_comm)
 
