@@ -41,7 +41,7 @@ program ring
     t0(0)     = 0.+273.
     t0(n + 1) = 37.+273.
 
-    o = int(1./delt)
+    o = int(10./delt)
 
     !do heat sim
     do p = 1, o

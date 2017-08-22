@@ -27,6 +27,7 @@ subroutine heat_sim_3D(jmean, tissue, temp, numpoints, flag, id, numproc, new_co
         real              :: u_xx, u_yy, u_zz, delt, time, alpha, k0ts, k0ms, k0ta, k0ma, dx, dy, dz, dx2, dy2, dz2
         real              :: rho, kappa, c_heat, laserOn, pulselength, repetitionRate_1, pulseCount, repetitionCount
         real              :: betax, gammax, betay, gammay, betaz, gammaz, h, t_air, t_air4, rx, ry, rz, eps, sigma, eta
+        real              :: tim_fin, tim_srt, coeff
         real, allocatable :: T0(:,:,:), jtmp(:,:,:), coeff1(:,:,:), coeff2(:,:,:)
         integer           :: i, j, k, p, u, size_x, size_y, size_z, xi, yi, zi, xf, yf, zf, lo, N, o
         logical :: laser_flag
@@ -72,45 +73,45 @@ subroutine heat_sim_3D(jmean, tissue, temp, numpoints, flag, id, numproc, new_co
         dy = 1. / (numpoints + 2)
         dz = 1. / (numpoints + 2)  
 
-        dx2 = 1./dx**2
-        dy2 = 1./dy**2.
-        dz2 = 1./dz**2.
+        ! dx2 = 1./dx**2
+        ! dy2 = 1./dy**2.
+        ! dz2 = 1./dz**2.
 
-        delt = 0.125 * (min(dx,dy,dz)**3)/alpha
-        k0ts = alpha * delt
-        k0ms = k0ts/kappa
+        ! delt = 0.125 * (min(dx,dy,dz)**3)/alpha
+        ! k0ts = alpha * delt
+        ! k0ms = k0ts/kappa
 
         !init heat variables for air
-        kappa = 0.0260e-2 ! W/cm C
-        rho = 0.0012 ! g/cm^3
-        c_heat = 1.012 !J/g C
+        ! kappa = 0.0260e-2 ! W/cm C
+        ! rho = 0.0012 ! g/cm^3
+        ! c_heat = 1.012 !J/g C
 
-        rho = rho/1000.
-        c_heat = c_heat*1000.
+        ! rho = rho/1000.
+        ! c_heat = c_heat*1000.
 
-        alpha = kappa / (rho * c_heat)
+        ! alpha = kappa / (rho * c_heat)
+        coeff = alpha*delt/kappa
+        ! k0ta = alpha * delt
+        ! k0ma = k0ta/kappa
 
-        k0ta = alpha * delt
-        k0ma = k0ta/kappa
+        ! where(tissue < 3.)
+        !     coeff1 = k0ts
+        !     coeff2 = k0ms
+        ! elsewhere
+        !     coeff1 = k0ta
+        !     coeff2 = k0ma
+        ! end where
 
-        where(tissue < 3.)
-            coeff1 = k0ts
-            coeff2 = k0ms
-        elsewhere
-            coeff1 = k0ta
-            coeff2 = k0ma
-        end where
+        ! if(id==0)then
+        !     open(newunit=u,file=str(counter)//'coeff1.dat',access='stream',form='unformatted')
+        !     write(u)coeff1
+        !     close(u)
+        !     open(newunit=u,file=str(counter)//'coeff2.dat',access='stream',form='unformatted')
+        !     write(u)coeff2
+        !     close(u)
 
-        if(id==0)then
-            open(newunit=u,file=str(counter)//'coeff1.dat',access='stream',form='unformatted')
-            write(u)coeff1
-            close(u)
-            open(newunit=u,file=str(counter)//'coeff2.dat',access='stream',form='unformatted')
-            write(u)coeff2
-            close(u)
-
-        end if
-        call mpi_barrier(new_comm)
+        ! end if
+        ! call mpi_barrier(new_comm)
 
         xi = 1 
         xf = size_x
@@ -129,7 +130,7 @@ subroutine heat_sim_3D(jmean, tissue, temp, numpoints, flag, id, numproc, new_co
         betay = 1. + (dy*h/kappa)
         betaz = 1. + (dz*h/kappa)
 
-        delt = dx**2/(alpha*betax)
+        delt = dx**2/(6.*alpha*betax)
 
         gammax = dx*h*t_air/kappa
         gammay = dy*h*t_air/kappa
@@ -177,23 +178,28 @@ subroutine heat_sim_3D(jmean, tissue, temp, numpoints, flag, id, numproc, new_co
         laser_flag = .true.
         o = int(1./delt)
         lo = o / 100
-        print*,delt,o
+        if(id == 0)print*,delt,o
+        call cpu_time(tim_srt)
         do p = 1, o
             
             if(mod(p,lo) == 0 .and. id == 0) write(*,FMT="(A8,t21)",advance='no') achar(13)//str(real(p)/real(o)*100., 5)//' %'
-
+            if(p == 2 .and. id == 0)then
+                call cpu_time(tim_fin)
+                print*,(tim_fin-tim_srt)*o/60.
+            end if
             do k = zi, zf
                 do j = yi, yf
                     do i = xi, xf
-                        if(i == 1)then
-                        u_xx = (1.-2.*rx*betax) * t0(i,j,k) + (2. *rx * t0(i+1,j,k)) + (2. * rx * gammax) &
-                               - 2.*rx*eta*(t0(i,j,k)**4-T_air4)
+                        if(k == zf)then
+                        u_zz = (1.-2.*rz*betax) * t0(i,j,k) + (2. *rz * t0(i,j,k+1)) + (2. * rz * gammax) &
+                               - 2.*rz*eta*(t0(i,j,k)**4-T_air4)
                         else
-                            u_xx = rx*(t0(i - 1, j, k    ) - 2. * t0(i, j, k) + t0(i + 1, j, k)) 
+                            u_zz = rz*t0(i, j,     k - 1) + (1.-2.*rz) * t0(i, j, k) + rz*t0(i, j, k + 1)
                         end if
-                        u_yy = ry*(t0(i, j - 1, k    ) - 2. * t0(i, j, k) + t0(i, j + 1, k))
-                        u_zz = rz*(t0(i, j,     k - 1) - 2. * t0(i, j, k) + t0(i, j, k + 1))
-                        t0(i,j,k) = t0(i,j,k) + (u_xx + u_yy + u_zz)
+                        u_yy = ry*t0(i, j - 1, k    ) + (1.-2.*ry) * t0(i, j, k) + ry*t0(i, j + 1, k)
+                        u_xx = rx*t0(i - 1, j, k    ) + (1.-2.*rx) * t0(i, j, k) + rx*t0(i + 1, j, k)
+
+                        t0(i,j,k) = (u_xx + u_yy + u_zz)/3. + laserOn*coeff*jtmp(i,j,k)
                         !shouldnt be rx * everything...
                         !u_xx = (t0(i+1, j,   k)   - 2.*t0(i,j,k) + t0(i-1, j,   k))  * dx2
                         !u_yy = (t0(i,   j+1, k)   - 2.*t0(i,j,k) + t0(i,   j-1, k))  * dy2
@@ -251,7 +257,7 @@ subroutine heat_sim_3D(jmean, tissue, temp, numpoints, flag, id, numproc, new_co
         !send data to master process and do I/O
         if(id == 0)then
             open(newunit=u,file='temp-'//str(counter)//'.dat',access='stream',form='unformatted',status='replace')
-            write(u)temp
+            write(u)temp(1:numpoints,1:numpoints,1:numpoints)
             close(u)
             open(newunit=u,file='tissue-'//str(counter)//'.dat',access='stream',form='unformatted',status='replace')
             write(u)tissue

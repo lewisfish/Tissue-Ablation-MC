@@ -1,7 +1,7 @@
-1           nphotons
+900000           nphotons
 1.              xmax
 1.              ymax
 1.              zmax
 1.0             n1
 1.38              n2
-1              iters
+5           iters

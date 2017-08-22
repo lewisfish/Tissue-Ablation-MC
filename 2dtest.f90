@@ -14,7 +14,7 @@ program threedfinite
     kappa = 0.00209! W/cm K !0.0056 ! W/cm C
     rho = 1.07 ! g/cm^3
     c_heat = 3.4 !J/g K
-    t_air = 25.+273
+    t_air = 25.
     T_air4 = t_air**4
     eps = 0.98
     sigma = 5.670373e-8
@@ -46,11 +46,11 @@ program threedfinite
     ry = alpha * delt/dy**2
 
     !init conditions
-    t0        = 37.+273
-    t0(:,0)   = 37.+273    ! front face
-    t0(:,N+1) = 37.+273    ! back face
-    t0(N+1,:) = 37.+273    ! side face
-    t0(0,:)   = 37.+273    ! side face
+    t0        = 37.
+    t0(:,0)   = 37.    ! front face
+    t0(:,N+1) = 37.    ! back face
+    t0(N+1,:) = 37.    ! side face
+    t0(0,:)   = 37.    ! side face
 
     o = nint(10./delt)
     time = 0.
@@ -60,23 +60,26 @@ program threedfinite
             do i = 1,size_x
                 if(i == 1)then
                     u_xx = (1.-2.*rx*betax) * t0(i,j) + (2. * rx * t0(i+1,j)) + (2. * rx * gammax) - 2.*rx*eta*(t0(i,j)**4-T_air4)
-                    u_yy = ry*(t0(i,    j - 1) - 2. * t0(i, j) + t0(i    ,j + 1)) 
-                    t0(i,j) = u_xx + u_yy
+                    u_yy     = ry*t0(i,    j - 1) + (1.-2.*ry) * t0(i, j) + ry*t0(i    ,j + 1) 
+                    t0(i,j) = (u_xx + u_yy)/2.
                 else
-                    u_xx     = rx*(t0(i - 1,j    ) - 2. * t0(i, j) + t0(i + 1,j    ))
-                    u_yy     = ry*(t0(i,    j - 1) - 2. * t0(i, j) + t0(i    ,j + 1)) 
-                    t0(i, j) = t0(i, j) + u_xx + u_yy
+                    u_xx     = rx*t0(i - 1,j    ) + (1.-2.*rx) * t0(i, j) + rx*t0(i + 1,j    )
+                    u_yy     = ry*t0(i,    j - 1) + (1.-2.*ry) * t0(i, j) + ry*t0(i    ,j + 1) 
+                    ! print*,u_xx , u_yy
+                    t0(i, j) = (u_xx + u_yy)/2.
                 end if
             end do
+
         end do
+
     time = time + delt
     end do
     print*,
     print*,time,p
 
-   open(newunit=u,file='temperature.dat')
+    open(newunit=u,file='temperature.dat')
     do j =1,n
-        write(u,*)(t0(i,j)-273.,i=1,n)
+        write(u,*)(t0(i,j),i=1,n)
     end do
     close(u)
 

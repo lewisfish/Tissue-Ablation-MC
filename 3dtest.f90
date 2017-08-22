@@ -2,19 +2,19 @@ program threedfinite
 
     implicit none
     
-    real              :: u_xx, u_yy, u_zz, h, kappa, rho, c_heat, t_air, alpha, rx, ry, rz, eta, eps, sigma, t_air4
-    real              :: delt, time, dx, dy, dz, betax, betay, betaz, gammax, gammay, gammaz
-    real, allocatable :: T0(:,:,:)
+    double precision              :: u_xx, u_yy, u_zz, h, kappa, rho, c_heat, t_air, alpha, rx, ry, rz, eta, eps, sigma, t_air4
+    double precision              :: delt, time, dx, dy, dz, betax, betay, betaz, gammax, gammay, gammaz
+    double precision, allocatable :: T0(:,:,:)
     integer           :: N, i, j, k, p, u, size_x, size_y, size_z, o
 
 
-    N = 50
+    N = 52
 
     h = 10.
     kappa = 0.00209 !0.0056 ! W/cm K
     rho = 1.07 ! g/cm^3
     c_heat = 3.4 !J/g K
-    t_air = 25.+273
+    t_air = 25.+273.
     t_air4 = t_air**4
     eps = 0.98
     sigma = 5.670373e-8
@@ -44,7 +44,7 @@ program threedfinite
     gammay = (dy * h * T_air) /kappa
     gammaz = (dz * h * T_air) /kappa
 
-    eta = eps*sigma*dx*dy*betax
+    eta = eps*sigma*dx*dy*dz*betax
 
     rx = alpha * delt/dx**2
     ry = alpha * delt/dy**2
@@ -57,10 +57,11 @@ program threedfinite
     t0(N+1,:,:) = 37.  ! side face
     t0(0,:,:) = 25.    ! side face
     t0(:,:,N+1) = 37.  ! top face 
-    t0 = t0 + 273.
+    t0 = t0+273.
 
-    o = nint(10./delt)
-
+    o = nint(1./delt)
+    time=0.
+    print*,o,delt
     do p = 1, o
         do k = 1, size_z
             do j = 1, size_y
@@ -68,14 +69,14 @@ program threedfinite
                     if(i == 1)then
                         u_xx = (1.-2.*rx*betax) * t0(i,j,k) + (2. *rx * t0(i+1,j,k)) + (2. * rx * gammax) &
                                - 2.*rx*eta*(t0(i,j,k)**4-T_air4)
-                        u_yy = ry*(t0(i, j - 1, k    ) - 2. * t0(i, j, k) + t0(i, j + 1, k))
-                        u_zz = rz*(t0(i, j,     k - 1) - 2. * t0(i, j, k) + t0(i, j, k + 1))
-                        t0(i,j,k) = u_xx + u_yy + u_zz
+                        u_yy = ry*t0(i, j - 1, k    ) + (1.-2.*ry) * t0(i, j, k) + ry*t0(i, j + 1, k)
+                        u_zz = rz*t0(i, j,     k - 1) + (1.-2.*rz) * t0(i, j, k) + rz*t0(i, j, k + 1)
+                        t0(i,j,k) = (u_xx + u_yy + u_zz)/3.
                     else
-                        u_xx = rx*(t0(i - 1, j, k    ) - 2. * t0(i, j, k) + t0(i + 1, j, k))
-                        u_yy = ry*(t0(i, j - 1, k    ) - 2. * t0(i, j, k) + t0(i, j + 1, k))
-                        u_zz = rz*(t0(i, j,     k - 1) - 2. * t0(i, j, k) + t0(i, j, k + 1))
-                        t0(i,j,k) = t0(i,j,k) + (u_xx + u_yy + u_zz)
+                        u_xx = rx*t0(i - 1, j, k    ) + (1.-2.*rx) * t0(i, j, k) + rx*t0(i + 1, j, k)
+                        u_yy = ry*t0(i, j - 1, k    ) + (1.-2.*ry) * t0(i, j, k) + ry*t0(i, j + 1, k)
+                        u_zz = rz*t0(i, j,     k - 1) + (1.-2.*rz) * t0(i, j, k) + rz*t0(i, j, k + 1)
+                        t0(i,j,k) = (u_xx + u_yy + u_zz)/3.
                     end if
                 end do
             end do
@@ -84,12 +85,12 @@ program threedfinite
     end do
     print*,time,p,n
 
-    t0 = t0 - 273.
+    t0 = t0
 
    inquire(iolength=i)t0(1:n,1:n,1:n)
    open(newunit=u,file='temperature.dat',access='direct',status='REPLACE',form='unformatted',&
    recl=i)
-   write(u,rec=1) t0(1:n,1:n,1:n)
+   write(u,rec=1) t0(1:n,1:n,1:n)-273.
    close(u)
 
 end program threedfinite

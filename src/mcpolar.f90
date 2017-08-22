@@ -142,9 +142,9 @@ do while(end)
          call tauint1(xmax,ymax,zmax,xcell,ycell,zcell,tflag,iseed,delta)          
       end do
    end do      ! end loop over nph photons
-   call MPI_REDUCE(jmean, jmeanGLOBAL, (nxg*nyg*nzg),MPI_DOUBLE_PRECISION, MPI_SUM,0,new_comm)
+   call MPI_allREDUCE(jmean, jmeanGLOBAL, (nxg*nyg*nzg),MPI_DOUBLE_PRECISION, MPI_SUM,new_comm)
 
-   if(id==0)jmeanGLOBAL = jmeanGLOBAL * (50./(nphotons*numproc*(2.*xmax/nxg)*(2.*ymax/nyg)*(2.*zmax/nzg)))
+   jmeanGLOBAL = jmeanGLOBAL * (1000./(nphotons*numproc*(2.*xmax/nxg)*(2.*ymax/nyg)*(2.*zmax/nzg)))
    if(id==0)print*,counter
 call heat_sim_3d(jmeanGLOBAL, tissue, temp, N, flag, id, numproc, new_comm, tag, recv_status, right, left, counter)
 
