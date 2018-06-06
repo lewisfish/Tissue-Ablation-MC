@@ -16,53 +16,45 @@ CONTAINS
    integer, intent(INOUT) :: iseed
    real,    intent(IN)    :: xmax, ymax, zmax
    real                   :: ran2, radius2, offx, offy
-   integer :: j
 
+   real :: spotSize, spotGap, gridWidth, gridHeight, spotGapCol, spotGapRow, x, y, adjustFactorRow, adjustFactorCol, ranx, rany
+   real ::  cenx, ceny, theta, r
+   integer :: i, j, spotsPerRow, spotsPerCol, spotsTotal
 
+   gridWidth   = 2. * xmax!cm
+   gridHeight   = 2. * ymax!cm
+   spotsPerRow = 7
+   spotsPerCol = 7
+   spotsTotal  = spotsPerRow * spotsPerCol
+   spotSize    = 150d-4 !um
+   spotGapRow  = (gridWidth - (spotsPerRow * spotSize)) / (spotsPerRow + 1.)
+   spotGapCol  = (gridHeight - (spotsPercol * spotSize)) / (spotsPerCol + 1.) 
+
+   !centre pixels
+   adjustFactorRow = abs((nint(7./2.) * spotGapRow) + (spotSize/2.) - xmax)
+   adjustFactorCol = abs((nint(7./2.) * spotGapcol) + (spotSize/2.) - ymax)
+
+   !get random integer between 1 and spotsPer
+   ranx = int(ran2(iseed) * real(spotsPerRow)) + 1
+   rany = int(ran2(iseed) * real(spotsPerCol)) + 1
+
+   !get centre of spot
+   x = (ranx * spotGapRow) + (spotSize/2.)   
+   y = (rany * spotGapCol) + (spotSize/2.)
+   cenx = x - xmax + adjustFactorRow
+   ceny = y - ymax + adjustFactorCol
+
+   !http://mathworld.wolfram.com/DiskPointPicking.html
+   !sample circle uniformly
+   !sample radius between [0,r^2]
+   r = ran2(iseed) * (spotSize/2.)**2
+   theta = ran2(iseed) * twopi
+   x = sqrt(r) * cos(theta)
+   y = sqrt(r) * sin(theta)
+   !get final point
+   xp = x - cenx
+   yp = y - ceny
    zp = zmax-(1.e-8*(2.*zmax/nzg))
-
-   xp = xmax*(2.*ran2(iseed)-1.)
-   yp = ymax*(2.*ran2(iseed)-1.)
-   
-   radius2 = .05**2.
-
-   select case(j)
-   case(0:100000)!bottom left
-      offy =  .5
-      offx = -.5
-   case(100001:200000)!mid left
-      offy = 0.
-      offx = -.5
-   case(200001:300000)!top left
-      offy = -.5
-      offx = -.5
-   case(300001:400000)!bottom mid
-      offy = .5
-      offx = 0.
-   case(400001:500000)!middle
-      offy = 0.
-      offx = 0.
-   case(500001:600000)!top mid
-      offy = -.5
-      offx = 0.
-   case(600001:700000)!bottom right
-      offy = .5
-      offx = .5
-   case(700001:800000)!mid right
-      offy = 0.
-      offx = .5
-   case(800001:900000)!top right
-      offy = -.5
-      offx = .5
-   case default
-      stop "error, undefined photon number..."     
-   end select  
-
-
-   do while((xp-offx)**2.+(yp-offy)**2. > radius2)
-      xp = xmax*(2.*ran2(iseed)-1.)
-      yp = ymax*(2.*ran2(iseed)-1.)
-   end do
 
    phi = twopi * ran2(iseed)
    cosp = cos(phi)
@@ -73,7 +65,6 @@ CONTAINS
    nxp = sint * cosp  
    nyp = sint * sinp
    nzp = cost
-   
    
    !*************** Linear Grid *************************
    xcell=int(nxg*(xp+xmax)/(2.*xmax))+1

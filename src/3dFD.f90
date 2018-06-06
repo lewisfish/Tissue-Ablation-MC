@@ -10,7 +10,8 @@ Module Heat
 subroutine heat_sim_3D(jmean, tissue, temp, numpoints, flag, id, numproc, new_comm, tag, recv_status, right, left,counter)
 
         use mpi_f08
-        use utils, only : str
+        use utils,     only : str
+        use constants, only : fileplace
 
         implicit none
         
@@ -28,7 +29,7 @@ subroutine heat_sim_3D(jmean, tissue, temp, numpoints, flag, id, numproc, new_co
         real              :: rho, kappa, c_heat, laserOn, pulselength, repetitionRate_1, pulseCount, repetitionCount
         real              :: betax, gammax, betay, gammay, betaz, gammaz, h, t_air, t_air4, rx, ry, rz, eps, sigma, eta
         real              :: tim_fin, tim_srt, coeff
-        real, allocatable :: T0(:,:,:), jtmp(:,:,:)
+        real, allocatable :: T0(:,:,:), jtmp(:,:,:), Ttmp(:,:,:)
         integer           :: i, j, k, p, u, size_x, size_y, size_z, xi, yi, zi, xf, yf, zf, lo, N, o
         logical :: laser_flag
 
@@ -91,6 +92,9 @@ subroutine heat_sim_3D(jmean, tissue, temp, numpoints, flag, id, numproc, new_co
         !allocate mesh
         allocate(T0(0:numpoints+1, 0:numpoints+1, zi-1:zf+1))
         allocate(jtmp(numpoints, numpoints, zi:zf))
+        allocate(Ttmp, source=tissue)
+        Ttmp=0.
+
 
         betax = 1. + (dx*h/kappa)
         betay = 1. + (dy*h/kappa)
@@ -133,8 +137,8 @@ subroutine heat_sim_3D(jmean, tissue, temp, numpoints, flag, id, numproc, new_co
 
         time = 0.
         laserOn = 1.
-        pulselength = 200.d-5
-        repetitionRate_1 = 0.01
+        pulselength = 200d-3
+        repetitionRate_1 = 1.d0/1.d0
 
         if(pulselength < delt)then
             if(id==0)print*,"pulselength smaller than timestep, adjusting..."
@@ -150,10 +154,10 @@ subroutine heat_sim_3D(jmean, tissue, temp, numpoints, flag, id, numproc, new_co
         call cpu_time(tim_srt)
         do p = 1, o
             
-            if(mod(p,lo) == 0 .and. id == 0) write(*,FMT="(A8,t21)",advance='no') achar(13)//str(real(p)/real(o)*100., 5)//' %'
-            if(p == 2 .and. id == 0)then
+            if(mod(p,lo) == 0 .and. id == 0) print*,p!write(*,FMT="(A8,t21)",advance='no') achar(13)//str(real(p)/real(o)*100., 5)//' %'
+            if(p == 500 .and. id == 0)then
                 call cpu_time(tim_fin)
-                print*, 'est. time for loop ~ ',str((tim_fin-tim_srt)*o,2)//'s'
+                print*, 'est. time for loop ~ ',str((tim_fin-tim_srt)*o/100.,5)//'s'
             end if
             do k = zi, zf
                 do j = yi, yf
@@ -181,54 +185,52 @@ subroutine heat_sim_3D(jmean, tissue, temp, numpoints, flag, id, numproc, new_co
                               t0(:,:,zi-1), size(t0(:,:,zi-1)), mpi_double_precision, left, tag, &
                               new_comm, recv_status)
 
-            time = time + delt
-            pulseCount = pulseCount + delt
-            repetitionCount = repetitionCount + delt
-            if(pulseCount >= pulselength .and. laserOn > 0.)then
-                pulseCount = 0.
+            if(pulseCount >= pulseLength .and. laser_flag)then!turn laser off
+                laser_flag = .false.
                 laserOn = 0.
-                if(laser_flag)then
-                    laser_flag = .false.
-                    ! if(id==0)print*,'off'
-                end if
-            end if
-            if(repetitionCount >= repetitionRate_1)then
                 pulseCount = 0.
                 repetitionCount = 0.
+            elseif((repetitionCount >= repetitionRate_1) .and. (.not.laser_flag))then
+                laser_flag = .true.
                 laserOn = 1.
-                if(.not.laser_flag)then
-                    laser_flag = .true.
-                    ! if(id==0)print*,'on'
-                end if
+                pulseCount = 0.
+                repetitionCount = 0.
             end if
-           call Arrhenius(t0(xi:xf,yi:yf,zi:zf), time, tissue, zi, zf, numpoints)
+            pulseCount = pulseCount + delt
+            repetitionCount = repetitionCount + delt
+            time = time + delt
+           call Arrhenius(t0(xi:xf,yi:yf,zi:zf), time, tissue(xi:xf,yi:yf,zi:zf), zi, zf, numpoints)
 
         end do
-        if(id == 0)print*,' '
-        call mpi_gather(t0(:,:,zi:zf), size(t0(:,:,zi:zf)), mpi_double_precision, temp, size(temp(:,:,zi:zf)),&
-                        mpi_double_precision, 0, new_comm)
 
-        jtmp = tissue
+        call mpi_gather(t0(:,:,zi-1:zf+1), size(t0(:,:,zi-1:zf+1)), mpi_double_precision, &
+                        temp(:,:,zi-1:zf+1), size(temp(:,:,zi-1:zf+1)), mpi_double_precision, 0, new_comm)
 
-        call mpi_gather(tissue(xi:xf,yi:yf,zi:zf), size(tissue(xi:xf,yi:yf,zi:zf)), mpi_double_precision, &
-                        jtmp, size(jtmp(xi:xf,yi:yf,zi:zf)), mpi_double_precision, 0, new_comm)
+        call mpi_gather(tissue(:,:,zi:zf), size(tissue(:,:,zi:zf)), mpi_double_precision, &
+                        Ttmp(:,:,zi:zf), size(Ttmp(:,:,zi:zf)), mpi_double_precision, 0, new_comm)
 
-        tissue = jtmp
+        tissue = Ttmp
+
+        ! call mpi_allreduce(mpi_in_place, tissue, size(tissue), mpi_double_precision, mpi_sum, new_comm)
 
         !send data to master process and do I/O
+
         if(id == 0)then
-            open(newunit=u,file='temp-'//str(counter)//'.dat',access='stream',form='unformatted',status='replace')
-            write(u)temp(1:numpoints,1:numpoints,1:numpoints)
+            open(newunit=u,file=trim(fileplace)//'deposit/temp-'//str(counter)//'.dat',access='stream', &
+                 form='unformatted',status='replace')
+            write(u)temp
             close(u)
-            open(newunit=u,file='tissue-'//str(counter)//'.dat',access='stream',form='unformatted',status='replace')
+
+            open(newunit=u,file=trim(fileplace)//'deposit/tissue-'//str(counter)//'.dat',access='stream', &
+                 form='unformatted',status='replace')
             write(u)tissue
             close(u)
         end if
 
-        deallocate(t0, jtmp)
+        deallocate(t0, jtmp, Ttmp)
    end subroutine heat_sim_3D
 
-    subroutine Arrhenius(Temp, delt, tissue, zi, zf, numpoints)
+    subroutine Arrhenius(temp, delt, tissue, zi, zf, numpoints)
 
         implicit none
 
@@ -236,28 +238,36 @@ subroutine heat_sim_3D(jmean, tissue, temp, numpoints, flag, id, numproc, new_co
         real,    intent(IN)    :: temp(numpoints,numpoints,zi:zf), delt
         real,    intent(INOUT) :: tissue(numpoints,numpoints,zi:zf)
 
-        ! double precision :: a, g, r
-        ! integer          :: x, y, z
+        double precision :: a, g, r
+        integer          :: x, y, z
 
-        ! a = 3.1d91!2.9e27
-        ! g = 6.28e5!2.4e5
-        ! r = 8.314
+        a = 3.1d91!2.9e27
+        g = 6.28e5!2.4e5
+        r = 8.314
 
-        where(temp >= 44 .and. temp < 100)
-            tissue = 1.!tissue + time*A*exp(-G/(R*(temp+273.)))
-        elsewhere(temp >= 100 .and. temp < 200.)
+        where(temp >= 44+273 .and. temp < 100+273)
+            tissue = 0.!tissue + time*A*exp(-G/(R*(temp+273.)))
+        elsewhere(temp >= 100+273 .and. temp < 200.+273)
+            tissue = 1.
+        elsewhere(temp >= 200.+273. .and. temp < 300.+273)
             tissue = 2.
-        elsewhere(temp >= 200.)
+        elsewhere(temp >= 300.+273. .and. temp < 400.+273)
             tissue = 3.
+        elsewhere(temp >= 400.+273. .and. temp < 500.+273)
+            tissue = 4.
+        elsewhere(temp >= 500.+273. .and. temp < 600.+273)
+            tissue = 5.
+        elsewhere(temp >= 600.+273. .and. temp < 700.+273)
+            tissue = 6.
         end where
         ! do z = zi, zf
-            ! do y = 1, numpoints
-                ! do x = 1, numpoints
-                    ! if(temp(x, y, z) >= 44)then
-                        ! tissue(x, y, z) = tissue(x, y, z) + delt*A*exp(-G/(R*(temp(x,y,z)+273)))
-                    ! end if
-                ! end do
-            ! end do
+        !     do y = 1, numpoints
+        !         do x = 1, numpoints
+        !             if(temp(x, y, z) >= 44)then
+        !                 tissue(x, y, z) = tissue(x, y, z) + delt*A*exp(-G/(R*(temp(x,y,z)+273)))
+        !             end if
+        !         end do
+        !     end do
         ! end do
 
     end subroutine  Arrhenius

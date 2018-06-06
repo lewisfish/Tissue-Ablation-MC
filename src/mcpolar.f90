@@ -32,13 +32,18 @@ type(mpi_comm)   :: comm, new_comm
 type(MPI_Status) :: recv_status
 integer          :: right, left, id, numproc, dims(2), ndims, tag
 logical          :: periods(1), reorder
+
+
 call MPI_init()
+comm    = MPI_COMM_WORLD
+call MPI_Comm_size(comm, numproc)
+
 
 !set directory paths
 call directory
 
 !allocate and set arrays to 0
-call alloc_array
+call alloc_array(numproc)
 call zarray
 
 N = 104 ! points for heat sim
@@ -48,11 +53,6 @@ allocate(temp(0:N+1, 0:N+1, 0:N+1))
 temp    = 0.
 tissue  = 0.
 counter = 0
-comm    = MPI_COMM_WORLD
-
-
-call MPI_Comm_size(comm, numproc)
-
 !setup topology variables
 tag     = 1
 dims    = 0
@@ -116,7 +116,7 @@ do while(end)
 
       tflag=.FALSE.
 
-      if(mod(j,100000) == 0)then
+      if(mod(j,1000000) == 0)then
          print *, str(j)//' scattered photons completed on core: '//str(id)
       end if
        
@@ -144,7 +144,7 @@ do while(end)
    end do      ! end loop over nph photons
    call MPI_REDUCE(jmean, jmeanGLOBAL, (nxg*nyg*nzg),MPI_DOUBLE_PRECISION, MPI_SUM,0,new_comm)
 
-   jmeanGLOBAL = jmeanGLOBAL * (1./(nphotons*numproc*(2.*xmax/nxg)*(2.*ymax/nyg)*(2.*zmax/nzg)))
+   jmeanGLOBAL = jmeanGLOBAL * (25./(nphotons*numproc*(2.*xmax/nxg)*(2.*ymax/nyg)*(2.*zmax/nzg)))
    if(id==0)print*,counter
 call heat_sim_3d(jmeanGLOBAL, tissue, temp, N, flag, id, numproc, new_comm, tag, recv_status, right, left, counter)
 
@@ -161,8 +161,9 @@ call heat_sim_3d(jmeanGLOBAL, tissue, temp, N, flag, id, numproc, new_comm, tag,
    ! call MPI_Bcast(rhokap, size(rhokap), MPI_DOUBLE_PRECISION ,0 , new_comm)
 
    if(id == 0)then
-      open(newunit=u,file=trim(fileplace)//'jmean/rhokap-'//str(counter)//'.dat',access='stream',form='unformatted')
+      open(newunit=u,file=trim(fileplace)//'jmean/rhokap-'//str(counter-1)//'.dat',access='stream',form='unformatted',status='replace')
       write(u)rhokap
+      close(u)
    end if
    if(.not. end)exit
    jmean = 0.

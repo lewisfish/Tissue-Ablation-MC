@@ -1,12 +1,13 @@
 ifeq ($(FCOMP),mpifort)
-FCFLAGS = -O2 -cpp -freal-4-real-8 -march=native -ftree-vectorize -flto -funroll-loops
-FCDEBUG = -g -fbacktrace -fcheck=all -fbounds-check -ffpe-trap=invalid,overflow,underflow,denormal
+FCFLAGS = -O2 -freal-4-real-8 -march=native -flto
+FCDEBUG = -g -fbacktrace -fcheck=all -fbounds-check
+# -ffpe-trap=invalid,overflow,underflow,denormal
 FCBUILD = -Wall -Wextra -pedantic
 else ifeq ($(FCOMP),mpiifort)
 FCFLAGS = -O2 -cpp -r8 -xHOST -Dintel -ipo
-FCDEBUG = -g -debug 
+FCDEBUG = -g -debug -traceback -check all -CB -CU -CA
 #-traceback -check all -CB -CU -CA -fpe0 -debug
-FCBUILD = -warn all -stand f08
+FCBUILD = -g -debug -traceback -check all -CB -CA -CU -warn all -stand f08
 endif
 
 PROGRAM =  mcgrid 
