@@ -7,30 +7,29 @@ Module Heat
 
     contains
 
-subroutine heat_sim_3D(jmean, tissue, temp, numpoints, flag, id, numproc, new_comm, tag, recv_status, right, left,counter)
+subroutine heat_sim_3D(jmean, tissue, temp, numpoints, flag, id, numproc, new_comm, right, left,counter, Q)
 
         use mpi_f08
         use utils,     only : str
-        use constants, only : fileplace
+        use constants, only : fileplace, nxg, nyg, nzg
 
         implicit none
         
-        real,    intent(IN)    :: jmean(:,:,:)
-        integer, intent(IN)    :: numpoints
-        real,    intent(INOUT) :: tissue(:,:,:), temp(0:numpoints+1,0:numpoints+1,0:numpoints+1)
-        logical, intent(INOUT) :: flag
+        real,           intent(IN)    :: jmean(:,:,:)
+        integer,        intent(IN)    :: numpoints, right, left, id, numproc,counter
+        type(mpi_comm), intent(IN)    :: new_comm
+        real,           intent(INOUT) :: tissue(:,:,:), q(nxg,nyg,nzg), temp(0:numpoints+1,0:numpoints+1,0:numpoints+1)
+        logical,        intent(INOUT) :: flag
 
-        type(mpi_comm)   :: new_comm
         type(MPI_Status) :: recv_status
-        integer          :: right, left, id, numproc,  tag,counter
 
         !heat variables
-        real              :: u_xx, u_yy, u_zz, delt, time, alpha, k0ts, k0ms, k0ta, k0ma, dx, dy, dz
+        real              :: u_xx, u_yy, u_zz, delt, time, alpha, dx, dy, dz
         real              :: rho, kappa, c_heat, laserOn, pulselength, repetitionRate_1, pulseCount, repetitionCount
         real              :: betax, gammax, betay, gammay, betaz, gammaz, h, t_air, t_air4, rx, ry, rz, eps, sigma, eta
-        real              :: tim_fin, tim_srt, coeff
-        real, allocatable :: T0(:,:,:), jtmp(:,:,:), Ttmp(:,:,:)
-        integer           :: i, j, k, p, u, size_x, size_y, size_z, xi, yi, zi, xf, yf, zf, lo, N, o
+        real              :: tim_fin, tim_srt, coeff, Q_vapor, L_w, mass_voxel
+        real, allocatable :: T0(:,:,:), jtmp(:,:,:), Ttmp(:,:,:), qtmp(:,:,:)
+        integer           :: i, j, k, p, u, size_x, size_y, size_z, xi, yi, zi, xf, yf, zf, lo, N, o, tag=1
         logical :: laser_flag
 
         if(id == 0)then
@@ -56,6 +55,12 @@ subroutine heat_sim_3D(jmean, tissue, temp, numpoints, flag, id, numproc, new_co
         t_air = 25.+273.
         t_air4 = t_air**4
         h = 10.
+        L_w = 2256.d3 !J/kg
+        !assume 70% water
+        mass_voxel = 997.*(2.*0.55d-2/nxg)**3.!kg cm-3
+        Q_vapor = L_w * mass_voxel !joules
+        print*,Q_vapor
+
 
         rho = rho/1000.
         c_heat = c_heat*1000.
@@ -90,11 +95,11 @@ subroutine heat_sim_3D(jmean, tissue, temp, numpoints, flag, id, numproc, new_co
         zf = size_z
 
         !allocate mesh
-        allocate(T0(0:numpoints+1, 0:numpoints+1, zi-1:zf+1))
+        allocate(T0, source=temp)
         allocate(jtmp(numpoints, numpoints, zi:zf))
         allocate(Ttmp, source=tissue)
+        allocate(qtmp, source=Q)
         Ttmp=0.
-
 
         betax = 1. + (dx*h/kappa)
         betay = 1. + (dy*h/kappa)
@@ -112,24 +117,6 @@ subroutine heat_sim_3D(jmean, tissue, temp, numpoints, flag, id, numproc, new_co
         rx = alpha * delt/(dx**2) 
         ry = alpha * delt/(dy**2) 
         rz = alpha * delt/(dz**2) 
-
-        ! t0 = 37.
-        if(flag)then
-            ! t0(xf+1,:,:) = 37.  ! side face
-            ! t0(xi-1,:,:) = 37.    ! side face
-            ! t0(:,yi-1,:) = 37. ! front face
-            ! t0(:,yf+1,:) = 37.  ! back face
-            ! if(id == numproc - 1)then
-            !     t0(:,:,zf+1) = 37.  ! top face
-            ! end if
-            ! if(id == 0)t0(:,:,zi-1) = 37.  ! bottom face 
-            flag = .false.
-            t0 = 37. + 273.
-            temp = 37. + 273.
-        else
-            call mpi_scatter(temp, size(temp(:,:,zi-1:zf+1)), mpi_double_precision, &
-                             t0(:,:,zi-1:zf+1), size(t0(:,:,zi-1:zf+1)), mpi_double_precision, 0, new_comm)
-        end if
 
         jtmp = 0.
         call mpi_scatter(jmean, size(jmean(:,:,zi:zf)), mpi_double_precision, jtmp(:,:,zi:zf), size(jtmp(:,:,zi:zf)), &
@@ -170,10 +157,19 @@ subroutine heat_sim_3D(jmean, tissue, temp, numpoints, flag, id, numproc, new_co
                         end if
                         u_yy = ry*t0(i, j - 1, k    ) + (1.-2.*ry) * t0(i, j, k) + ry*t0(i, j + 1, k)
                         u_xx = rx*t0(i - 1, j, k    ) + (1.-2.*rx) * t0(i, j, k) + rx*t0(i + 1, j, k)
-                        t0(i,j,k) = (u_xx + u_yy + u_zz)/3. + laserOn*coeff*jtmp(i,j,k)
+                        ! if(t0(i,j,k) >= 100.+273 .and. t0(i,j,k) <= 101.+273 .and. qtmp(i,j,k) < Q_vapor)then
+                        !     qtmp(i,j,k) = qtmp(i,j,k) + laserOn*delt*coeff*jtmp(i,j,k)
+                        !     t0(i,j,k) = 100. + 273.
+                        ! else
+                            t0(i,j,k) = (u_xx + u_yy + u_zz)/3. + laserOn*coeff*jtmp(i,j,k)
+                        ! end if
                     end do
                 end do
             end do
+
+            ! where(q >= Q_vapor)
+            !     tissue = 7.  
+            ! end where
 
             !send_recv data to right
             call MPI_Sendrecv(t0(:,:,zf), size(t0(:,:,zf)), mpi_double_precision, right, tag, &
@@ -210,24 +206,27 @@ subroutine heat_sim_3D(jmean, tissue, temp, numpoints, flag, id, numproc, new_co
                         Ttmp(:,:,zi:zf), size(Ttmp(:,:,zi:zf)), mpi_double_precision, 0, new_comm)
 
         tissue = Ttmp
-
-        ! call mpi_allreduce(mpi_in_place, tissue, size(tissue), mpi_double_precision, mpi_sum, new_comm)
+        call mpi_allreduce(qtmp, Q, size(Q), mpi_double_precision, mpi_sum, new_comm)
 
         !send data to master process and do I/O
-
         if(id == 0)then
             open(newunit=u,file=trim(fileplace)//'deposit/temp-'//str(counter)//'.dat',access='stream', &
                  form='unformatted',status='replace')
-            write(u)temp
+            write(u)temp - 273.
             close(u)
 
             open(newunit=u,file=trim(fileplace)//'deposit/tissue-'//str(counter)//'.dat',access='stream', &
                  form='unformatted',status='replace')
             write(u)tissue
             close(u)
-        end if
 
-        deallocate(t0, jtmp, Ttmp)
+            open(newunit=u,file=trim(fileplace)//'deposit/Q-'//str(counter)//'.dat',access='stream', &
+                 form='unformatted',status='replace')
+            write(u)Q
+            close(u)
+        end if
+        ! call mpi_barrier(new_comm)
+        deallocate(t0, jtmp, Ttmp, qtmp)
    end subroutine heat_sim_3D
 
     subroutine Arrhenius(temp, delt, tissue, zi, zf, numpoints)

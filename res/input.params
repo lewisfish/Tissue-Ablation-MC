@@ -1,7 +1,8 @@
-900000           nphotons
-1.              xmax
-1.              ymax
-1.              zmax
+1000000           nphotons
+0.55              xmax
+0.55              ymax
+0.55              zmax
 1.0             n1
 1.38              n2
 3           iters
+85          power (W)

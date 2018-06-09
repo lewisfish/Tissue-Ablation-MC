@@ -21,11 +21,11 @@ use utils
 
 implicit none
 
-integer           :: nphotons ,iseed, j, xcell, ycell, zcell, N, counter, u, iters
+integer           :: nphotons ,iseed, j, xcell, ycell, zcell, N, counter, u, iters,i,k
 logical           :: tflag, flag, end
 double precision  :: nscatt, nscattGLOBAL
-real              :: xmax, ymax, zmax, ran, delta, start, finish, ran2
-real, allocatable :: tissue(:,:,:), temp(:,:,:), tissueGLOBAL(:,:,:)
+real              :: xmax, ymax, zmax, ran, delta, start, finish, ran2, power
+real, allocatable :: tissue(:,:,:), temp(:,:,:), tissueGLOBAL(:,:,:), q(:,:,:)
 
 ! mpi variables
 type(mpi_comm)   :: comm, new_comm
@@ -47,8 +47,11 @@ call alloc_array(numproc)
 call zarray
 
 N = 104 ! points for heat sim
-allocate(tissue(nxg, nyg, nzg), tissueGLOBAL(nxg,nyg,nzg))
+allocate(tissue(nxg, nyg, nzg), tissueGLOBAL(nxg,nyg,nzg), q(nxg,nyg,nzg))
 allocate(temp(0:N+1, 0:N+1, 0:N+1))
+
+Q = 0.
+
 
 temp    = 0.
 tissue  = 0.
@@ -77,6 +80,7 @@ open(newunit=u,file=trim(resdir)//'input.params',status='old')
    read(u,*) n1
    read(u,*) n2
    read(u,*) iters
+   read(u,*) power
    close(u)
 
 ! set seed for rnd generator. id to change seed for each process
@@ -109,6 +113,9 @@ end = .true.
 print*,'Photons now running on core: ',id
 
 
+temp = 37 + 273.
+temp(:,:,size(temp,3)-1) = 25. + 273.
+
 do while(end)
    do j = 1, nphotons
 
@@ -121,7 +128,7 @@ do while(end)
       end if
        
    !***** Release photon from point source *******************************
-      call sourceph(xmax,ymax,zmax,xcell,ycell,zcell,iseed,j)
+      call sourceph(xmax,ymax,zmax,xcell,ycell,zcell,iseed)
 
    !****** Find scattering location
 
@@ -144,16 +151,17 @@ do while(end)
    end do      ! end loop over nph photons
    call MPI_REDUCE(jmean, jmeanGLOBAL, (nxg*nyg*nzg),MPI_DOUBLE_PRECISION, MPI_SUM,0,new_comm)
 
-   jmeanGLOBAL = jmeanGLOBAL * (25./(nphotons*numproc*(2.*xmax/nxg)*(2.*ymax/nyg)*(2.*zmax/nzg)))
-   if(id==0)print*,counter
-call heat_sim_3d(jmeanGLOBAL, tissue, temp, N, flag, id, numproc, new_comm, tag, recv_status, right, left, counter)
+   jmeanGLOBAL = jmeanGLOBAL * (power/(nphotons*numproc*(2.*xmax/nxg)*(2.*ymax/nyg)*(2.*zmax/nzg)))
+   if(id == 0)then
+      print*,counter
+   end if
+call heat_sim_3d(jmeanGLOBAL, tissue, temp, N, flag, id, numproc, new_comm, right, left, counter, Q)
 
    counter = counter + 1
    if(counter == iters)end = .false.
 
-   
    ! if(id == 0)then
-      where(tissue >= 3.)
+      where(tissue >= 6.)
          rhokap = 0.  
       end where
    ! end if
@@ -161,7 +169,8 @@ call heat_sim_3d(jmeanGLOBAL, tissue, temp, N, flag, id, numproc, new_comm, tag,
    ! call MPI_Bcast(rhokap, size(rhokap), MPI_DOUBLE_PRECISION ,0 , new_comm)
 
    if(id == 0)then
-      open(newunit=u,file=trim(fileplace)//'jmean/rhokap-'//str(counter-1)//'.dat',access='stream',form='unformatted',status='replace')
+      open(newunit=u,file=trim(fileplace)//'jmean/rhokap-'//str(counter-1)//"-"//str(power,3)//'.dat',access='stream',&
+           form='unformatted',status='replace')
       write(u)rhokap
       close(u)
    end if

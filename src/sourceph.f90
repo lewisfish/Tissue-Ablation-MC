@@ -4,7 +4,7 @@ implicit none
 save
 
 CONTAINS
-   subroutine sourceph(xmax,ymax,zmax,xcell,ycell,zcell,iseed,j)
+   subroutine sourceph(xmax,ymax,zmax,xcell,ycell,zcell,iseed)
 
    use constants, only : nxg,nyg,nzg,twopi
    use photon_vars
@@ -15,11 +15,11 @@ CONTAINS
    integer, intent(OUT)   :: xcell, ycell, zcell
    integer, intent(INOUT) :: iseed
    real,    intent(IN)    :: xmax, ymax, zmax
-   real                   :: ran2, radius2, offx, offy
+   real                   :: ran2
 
-   real :: spotSize, spotGap, gridWidth, gridHeight, spotGapCol, spotGapRow, x, y, adjustFactorRow, adjustFactorCol, ranx, rany
+   real :: spotSize, gridWidth, gridHeight, spotGapCol, spotGapRow, x, y, adjustFactorRow, adjustFactorCol, ranx, rany
    real ::  cenx, ceny, theta, r
-   integer :: i, j, spotsPerRow, spotsPerCol, spotsTotal
+   integer :: spotsPerRow, spotsPerCol, spotsTotal
 
    gridWidth   = 2. * xmax!cm
    gridHeight   = 2. * ymax!cm
