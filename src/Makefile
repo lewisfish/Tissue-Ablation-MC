@@ -1,11 +1,10 @@
 ifeq ($(FCOMP),mpifort)
 FCFLAGS =  -freal-4-real-8 -O2
-FCDEBUG = -g -fbacktrace -fcheck=all -fbounds-check
-# -ffpe-trap=invalid,overflow,underflow,denormal
+FCDEBUG = -g -fbacktrace -fcheck=all -fbounds-check -ffpe-trap=invalid,overflow,underflow,denormal
 FCBUILD = -Wall -Wextra -pedantic
 else ifeq ($(FCOMP),mpiifort)
 FCFLAGS = -O2 -cpp -r8 -xHOST -Dintel -ipo -heap-arrays
-FCDEBUG = -g -debug -traceback -check all -CB -CU -CA -fp-stack-check -gen-interfaces -warn interfaces -check arg_temp_created 
+FCDEBUG = -g -debug -traceback -check all -CB -CU -CA -fpe0
 #-traceback -check all -CB -CU -CA -fpe0 -debug
 FCBUILD = -g -debug -traceback -check all -CB -CA -CU -warn all -stand f08
 endif

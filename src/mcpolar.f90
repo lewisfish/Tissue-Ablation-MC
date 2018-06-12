@@ -25,7 +25,7 @@ integer           :: nphotons ,iseed, j, xcell, ycell, zcell, N, counter, u, ite
 logical           :: tflag, flag, end
 double precision  :: nscatt, nscattGLOBAL
 real              :: xmax, ymax, zmax, ran, delta, start, finish, ran2, power
-real, allocatable :: tissue(:,:,:), temp(:,:,:), tissueGLOBAL(:,:,:), q(:,:,:)
+real, allocatable :: temp(:,:,:), tissueGLOBAL(:,:,:), tissue(:,:,:)!, q(:,:,:) 
 
 ! mpi variables
 type(mpi_comm)   :: comm, new_comm
@@ -47,15 +47,19 @@ call alloc_array(numproc)
 call zarray
 
 N = 104 ! points for heat sim
-allocate(tissue(nxg, nyg, nzg), tissueGLOBAL(nxg,nyg,nzg), q(nxg,nyg,nzg))
+allocate(tissue(nxg, nyg, nzg))!, tissueGLOBAL(nxg,nyg,nzg))!, q(nxg,nyg,nzg))
 allocate(temp(0:N+1, 0:N+1, 0:N+1))
 
-Q = 0.
 
+time            = 0.
+pulseCount      = 0.
+repetitionCount = 0.
+laserOn         = 1.
+laser_flag      = .TRUE.
 
-temp    = 0.
-tissue  = 0.
+! tissue  = 0.
 counter = 0
+
 !setup topology variables
 tag     = 1
 dims    = 0
@@ -114,67 +118,63 @@ print*,'Photons now running on core: ',id
 
 
 temp = 37 + 273.
-temp(:,:,size(temp,3)-1) = 25. + 273.
+power = power / 49.
+temp(N+1,:,:) = 37.+273.  ! side face
+temp(0,:,:) = 37.+273.    ! side face
+temp(:,0,:) = 37.+273. ! front face
+temp(:,N+1,:) = 37.+273.  ! back face
+temp(:,:,0) = 37.+273.  ! bottom face
+temp(:,:,N+1) = 25.+273.  ! top face 
 
-do while(end)
-   do j = 1, nphotons
+do while(time < .5)
+   if(laser_flag)then
 
-      call init_opt1
+      do j = 1, nphotons
 
-      tflag=.FALSE.
+         call init_opt1
 
-      if(mod(j,1000000) == 0)then
-         print *, str(j)//' scattered photons completed on core: '//str(id)
-      end if
-       
-   !***** Release photon from point source *******************************
-      call sourceph(xmax,ymax,zmax,xcell,ycell,zcell,iseed)
+         tflag=.FALSE.
 
-   !****** Find scattering location
-
-      call tauint1(xmax,ymax,zmax,xcell,ycell,zcell,tflag,iseed,delta)
-         
-   !******** Photon scatters in grid until it exits (tflag=TRUE) 
-      do while(tflag.eqv..FALSE.)
-         ran = ran2(iseed)
-         
-         if(ran < albedo)then!interacts with tissue
-            call stokes(iseed)
-            nscatt = nscatt + 1
-         else
-            tflag = .true.
-            exit
+         if(mod(j,1000000) == 0)then
+            print *, str(j)//' scattered photons completed on core: '//str(id)
          end if
-   !************ Find next scattering location
-         call tauint1(xmax,ymax,zmax,xcell,ycell,zcell,tflag,iseed,delta)          
-      end do
-   end do      ! end loop over nph photons
-   call MPI_REDUCE(jmean, jmeanGLOBAL, (nxg*nyg*nzg),MPI_DOUBLE_PRECISION, MPI_SUM,0,new_comm)
+          
+      !***** Release photon from point source *******************************
+         call sourceph(xmax,ymax,zmax,xcell,ycell,zcell,iseed)
 
-   jmeanGLOBAL = jmeanGLOBAL * (power/(nphotons*numproc*(2.*xmax/nxg)*(2.*ymax/nyg)*(2.*zmax/nzg)))
-   if(id == 0)then
-      print*,counter
+      !****** Find scattering location
+
+         call tauint1(xmax,ymax,zmax,xcell,ycell,zcell,tflag,iseed,delta)
+            
+      !******** Photon scatters in grid until it exits (tflag=TRUE) 
+         do while(tflag.eqv..FALSE.)
+            ran = ran2(iseed)
+            
+            if(ran < albedo)then!interacts with tissue
+               call stokes(iseed)
+               nscatt = nscatt + 1
+            else
+               tflag = .true.
+               exit
+            end if
+      !************ Find next scattering location
+            call tauint1(xmax,ymax,zmax,xcell,ycell,zcell,tflag,iseed,delta)          
+         end do
+      end do      ! end loop over nph photons
+      call MPI_REDUCE(jmean, jmeanGLOBAL, (nxg*nyg*nzg),MPI_DOUBLE_PRECISION, MPI_SUM,0,new_comm)
+
+      jmeanGLOBAL = jmeanGLOBAL * (power/(nphotons*numproc*(2.*xmax/nxg)*(2.*ymax/nyg)*(2.*zmax/nzg)))
    end if
-call heat_sim_3d(jmeanGLOBAL, tissue, temp, N, flag, id, numproc, new_comm, right, left, counter, Q)
 
-   counter = counter + 1
-   if(counter == iters)end = .false.
-
-   ! if(id == 0)then
-      where(tissue >= 6.)
-         rhokap = 0.  
-      end where
-   ! end if
-
-   ! call MPI_Bcast(rhokap, size(rhokap), MPI_DOUBLE_PRECISION ,0 , new_comm)
+   call heat_sim_3d(jmeanGLOBAL, temp, tissue, N, flag, id, numproc, new_comm, right, left, counter)
 
    if(id == 0)then
-      open(newunit=u,file=trim(fileplace)//'jmean/rhokap-'//str(counter-1)//"-"//str(power,3)//'.dat',access='stream',&
-           form='unformatted',status='replace')
-      write(u)rhokap
+      open(newunit=u,file=trim(fileplace)//"deposit/tissue-"//str(counter)//".dat",access="stream",form="unformatted")
+      write(u)tissue
       close(u)
    end if
-   if(.not. end)exit
+
+   counter = counter + 1
    jmean = 0.
 end do
 

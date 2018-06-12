@@ -26,7 +26,7 @@ CONTAINS
    spotsPerRow = 7
    spotsPerCol = 7
    spotsTotal  = spotsPerRow * spotsPerCol
-   spotSize    = 150d-4 !um
+   spotSize    = 250d-4 !um
    spotGapRow  = (gridWidth - (spotsPerRow * spotSize)) / (spotsPerRow + 1.)
    spotGapCol  = (gridHeight - (spotsPercol * spotSize)) / (spotsPerCol + 1.) 
 
