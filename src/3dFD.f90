@@ -3,18 +3,22 @@ Module Heat
     implicit none
 
     real    :: pulseCount, repetitionCount, time, laserOn
+    real    :: dx, dy, dz, eta
+    real, allocatable :: coeff(:,:,:), rx(:,:,:), ry(:,:,:), rz(:,:,:), gammaz(:,:), betaz(:,:)
     logical :: laser_flag
 
     private
-    public :: heat_sim_3D, pulseCount, repetitionCount, laserOn, laser_flag, time
+    public :: heat_sim_3D, pulseCount, repetitionCount, laserOn, laser_flag, time, initThermalCoeff
+    public :: coeff, dx, dy, dz, rx, ry, rz, gammaz, betaz, eta
 
     contains
 
-subroutine heat_sim_3D(jmean, temp, tissue, numpoints, flag, id, numproc, new_comm, right, left, counter)
+subroutine heat_sim_3D(jmean, temp, tissue, numpoints, id, numproc, new_comm, right, left, counter)
 
         use mpi_f08
         use utils,     only : str
         use constants, only : fileplace, nxg, nyg, nzg
+        use thermalConstants, only : skinDensity, skinThermalCond, skinHeatCap, tempAir4, skinBeta, skinAlpha
 
         implicit none
         
@@ -22,15 +26,13 @@ subroutine heat_sim_3D(jmean, temp, tissue, numpoints, flag, id, numproc, new_co
         integer,        intent(IN)    :: numpoints, right, left, id, numproc,counter
         type(mpi_comm), intent(IN)    :: new_comm
         real,           intent(INOUT) :: temp(0:numpoints+1,0:numpoints+1,0:numpoints+1), tissue(:,:,:)
-        logical,        intent(INOUT) :: flag
 
         type(MPI_Status) :: recv_status
 
         !heat variables
-        real              :: u_xx, u_yy, u_zz, delt, alpha, dx, dy, dz
-        real              :: rho, kappa, c_heat, pulselength, repetitionRate_1
-        real              :: betax, gammax, betay, gammay, betaz, gammaz, h, t_air, t_air4, rx, ry, rz, eps, sigma, eta
-        real              :: tim_fin, tim_srt, coeff, Q_vapor, L_w, mass_voxel
+        real              :: u_xx, u_yy, u_zz, delt, alpha
+        real              :: pulselength, repetitionRate_1
+        real              :: tim_fin, tim_srt, Q_vapor, L_w, mass_voxel
         real, allocatable :: T0(:,:,:), jtmp(:,:,:), Ttmp(:,:,:)
         integer           :: i, j, k, p, u, size_x, size_y, size_z, xi, yi, zi, xf, yf, zf, lo, N, o, tag,zsta,zfin
 
@@ -48,34 +50,10 @@ subroutine heat_sim_3D(jmean, temp, tissue, numpoints, flag, id, numproc, new_co
         !send N to all processes
         call MPI_Bcast(N, 1, MPI_integer ,0 , new_comm)
 
-        !init heat variables for medium
-        kappa = 0.00209 !0.0056 ! W/cm K
-        rho = 1.07 ! g/cm^3
-        c_heat = 3.4 !J/g K
-        eps = 0.98
-        sigma = 5.670373e-8
-        t_air = 25.+273.
-        t_air4 = t_air**4
-        h = 10.
-        ! L_w = 2256.d3 !J/kg
-        ! !assume 70% water
-        ! mass_voxel = 997.*(2.*0.55d-2/nxg)**3.!kg cm-3
-        ! Q_vapor = L_w * mass_voxel !joules
-        ! print*,Q_vapor
-
-        rho = rho/1000.
-        c_heat = c_heat*1000.
-
-        alpha = kappa / (rho * c_heat)
-
         !init grid
         size_x = numpoints
         size_y = numpoints
         size_z = N
-
-        dx = 1. / (numpoints + 2)
-        dy = 1. / (numpoints + 2)
-        dz = 1. / (numpoints + 2)  
 
         xi = 1 
         xf = size_x
@@ -85,6 +63,8 @@ subroutine heat_sim_3D(jmean, temp, tissue, numpoints, flag, id, numproc, new_co
 
         zi = 1
         zf = size_z
+
+        call setupThermalCoeff(temp, numpoints, numproc, id)
 
         !allocate mesh
         allocate(T0(0:numpoints+1, 0:numpoints+1, zi-1:zf+1))
@@ -104,29 +84,16 @@ subroutine heat_sim_3D(jmean, temp, tissue, numpoints, flag, id, numproc, new_co
             call mpi_recv(t0, size(t0), mpi_double_precision, 0, tag, new_comm, recv_status)
         end if
 
-        betax = 1. + (dx*h/kappa)
-        betay = 1. + (dy*h/kappa)
-        betaz = 1. + (dz*h/kappa)
+        delt = dx**2/(6.*skinAlpha*skinBeta)
+        delt = delt / 100.
 
-        delt = dx**2/(6.*alpha*betax)
-
-        gammax = dx*h*t_air/kappa
-        gammay = dy*h*t_air/kappa
-        gammaz = dz*h*t_air/kappa
-
-        eta = eps*sigma*dx*dy*betax
-        coeff = alpha*delt/kappa
-
-        rx = alpha * delt/(dx**2) 
-        ry = alpha * delt/(dy**2) 
-        rz = alpha * delt/(dz**2) 
 
         jtmp = 0.
         call mpi_scatter(jmean, size(jmean(:,:,zi:zf)), mpi_double_precision, jtmp(:,:,zi:zf), size(jtmp(:,:,zi:zf)), &
                          mpi_double_precision, 0, new_comm)
 
-        call mpi_scatter(tissue, size(tissue(:,:,zi:zf)), mpi_double_precision, Ttmp, size(Ttmp(:,:,zi:zf)), &
-                         mpi_double_precision, 0, new_comm)
+        ! call mpi_scatter(tissue, size(tissue(:,:,zi:zf)), mpi_double_precision, Ttmp, size(Ttmp(:,:,zi:zf)), &
+        !                  mpi_double_precision, 0, new_comm)
 
         pulselength = 200d-3
         repetitionRate_1 = 1.d0/1.d0
@@ -136,10 +103,10 @@ subroutine heat_sim_3D(jmean, temp, tissue, numpoints, flag, id, numproc, new_co
             delt = pulselength / 2.
         end if
 
-        if(id == 0)print*,laser_flag, laserOn
+        if(id == 0)print"(a,L)","Laser On: ",laser_flag
         o = int(1./delt)
         lo = o / 100
-        if(id == 0)print*,time, 1.0/delt,int(((1.0/delt) - time)/10) - counter
+        if(id == 0)print"(a,F9.5,1x,a,I4)","Elapsed Time: ",time, "Loops left: ",int(0.3/(100.*delt)) - counter
         call cpu_time(tim_srt)
         do p = 1, 100
             
@@ -149,14 +116,14 @@ subroutine heat_sim_3D(jmean, temp, tissue, numpoints, flag, id, numproc, new_co
                 do j = yi, yf
                     do i = xi, xf
                         if(k == zf .and. id == numproc-1)then!B.Cs
-                        u_zz = (1.-2.*rz*betax) * t0(i,j,k) + (2. *rz * t0(i,j,k+1)) + (2. * rz * gammax) &
-                               - 2.*rz*eta*(t0(i,j,k)**4-T_air4)
+                        u_zz = (1.-2.*rz(i,j,k)*betaz(i,j)) * t0(i,j,k) + (2. *rz (i,j,k+1)* t0(i,j,k+1)) + &
+                               (2. * rz(i,j,k) * gammaz(i,j)) - 2.*rz(i,j,k)*eta*betaz(i,j)*(t0(i,j,k)**4-tempAir4)
                         else
-                            u_zz = rz*t0(i, j,     k - 1) + (1.-2.*rz) * t0(i, j, k) + rz*t0(i, j, k + 1)
+                            u_zz = rz(i,j,k-1)*t0(i, j,     k - 1) + (1.-2.*rz(i,j,k)) * t0(i, j, k) + rz(i,j,k+1)*t0(i, j, k + 1)
                         end if
-                        u_yy = ry*t0(i, j - 1, k    ) + (1.-2.*ry) * t0(i, j, k) + ry*t0(i, j + 1, k)
-                        u_xx = rx*t0(i - 1, j, k    ) + (1.-2.*rx) * t0(i, j, k) + rx*t0(i + 1, j, k)
-                        t0(i,j,k) = (u_xx + u_yy + u_zz)/3. + laserOn*coeff*jtmp(i,j,k)
+                        u_yy = ry(i,j-1,k)*t0(i, j - 1, k    ) + (1.-2.*ry(i,j,k)) * t0(i, j, k) + ry(i,j+1,k)*t0(i, j + 1, k)
+                        u_xx = rx(i-1,j,k)*t0(i - 1, j, k    ) + (1.-2.*rx(i,j,k)) * t0(i, j, k) + rx(i+1,j,k)*t0(i + 1, j, k)
+                        t0(i,j,k) = (u_xx + u_yy + u_zz)/3. + laserOn*coeff(i,j,k)*jtmp(i,j,k)
                     end do
                 end do
             end do
@@ -190,12 +157,10 @@ subroutine heat_sim_3D(jmean, temp, tissue, numpoints, flag, id, numproc, new_co
         call mpi_gather(t0(:,:,zi:zf), size(t0(:,:,zi:zf)), mpi_double_precision, &
                         temp(:,:,zi:zf), size(temp(:,:,zi:zf)), mpi_double_precision, 0, new_comm)
 
+        call Arrhenius(temp(1:numpoints,1:numpoints,1:numpoints), time, tissue, zi, zf, numpoints)
 
         ! call mpi_gather(Ttmp, size(Ttmp), mpi_double_precision, &
         !                 tissue(:,:,zi:zf), size(tissue(:,:,zi:zf)), mpi_double_precision,0, new_comm)
-
-            call Arrhenius(temp(1:numpoints,1:numpoints,1:numpoints), time, tissue, zi, zf, numpoints)
-
 
         !send data to master process and do I/O
         if(id == 0)then
@@ -203,10 +168,97 @@ subroutine heat_sim_3D(jmean, temp, tissue, numpoints, flag, id, numproc, new_co
                  form='unformatted',status='replace')
             write(u)temp(1:numpoints,1:numpoints,1:numpoints) - 273.
             close(u)
-
         end if
         ! deallocate(t0, jtmp)
    end subroutine heat_sim_3D
+
+
+    subroutine initThermalCoeff(delt, numpoints)
+
+        use thermalConstants
+        use constants, only : nxg, nyg, nzg
+
+        implicit none
+
+        real,    intent(IN) :: delt
+        integer, intent(IN) :: numpoints
+
+        real :: alpha
+
+        dx = 2.d0 * .55d-2 / (numpoints + 2)
+        dy = 2.d0 * .55d-2 / (numpoints + 2)
+        dz = 2.d0 * .55d-2 / (numpoints + 2)  
+
+        skinBeta = 1.d0 + (dz*h/skinThermalCond)
+
+        eta = eps*S_B_Constant*dx*dy
+
+        allocate(coeff(0:nxg+1,0:nyg+1,0:nzg+1))
+        allocate(rx(0:nxg+1,0:nyg+1,0:nzg+1), ry(0:nxg+1,0:nyg+1,0:nzg+1), rz(0:nxg+1,0:nyg+1,0:nzg+1))
+        allocate(gammaz(nxg, nyg), betaz(nxg, nyg), )
+
+        coeff = 0.
+        coeff(1:nxg,1:nyg,1:nzg) = skinAlpha * delt/skinThermalCond
+
+        rx = skinAlpha * delt/(dx**2)
+        ry = skinAlpha * delt/(dy**2)
+        rz = skinAlpha * delt/(dz**2)
+
+        betaz = 1. + (dz*h/skinThermalCond)
+        gammaz = dz*h*tempAir/skinThermalCond
+
+        alpha = airThermalCond(25.) / (airDensity(25.) *  airHeatCap)
+
+        rx(:,:,nzg+1) = alpha * delt/(dx**2)
+        ry(:,:,nzg+1) = alpha * delt/(dy**2)
+        rz(:,:,nzg+1) = alpha * delt/(dz**2)
+
+    end subroutine initThermalCoeff
+
+
+    subroutine setupThermalCoeff(temp, numpoints, numproc, id)
+
+        use constants, only : nxg, nyg, nzg
+        use iarray, only : rhokap
+        use thermalConstants
+
+        implicit none
+
+        integer, intent(IN) :: id, numpoints, numproc
+        real,    intent(IN) :: temp(0:numpoints+1, 0:numpoints+1, 0:numpoints+1)
+
+        integer :: i, j, k
+        real    :: alphaAir, delt, kappa
+
+        do k = 1, nzg
+            do j = 1, nyg
+                do i = 1, nxg
+                    if(rhokap(i,j,k) <= 0.)then
+                        kappa = airThermalCond(temp(i,j,k))
+                        ! alpha = kappa / (rho * c_heat)
+                        alphaAir = kappa / (airDensity(temp(i,j,k)) * airHeatCap)
+                        ! rn = alpha * delt/(dn**2)
+                        rx(i,j,k) = alphaAir * delt / (dx**2) 
+                        ry(i,j,k) = alphaAir * delt / (dy**2)
+                        rz(i,j,k) = alphaAir * delt / (dz**2)
+                        coeff(i,j,k) = alphaAir*delt/ kappa 
+                    end if
+                end do
+            end do
+        end do
+
+        if(id == numproc-1)then
+            do j = 1, nyg
+                do i = 1, nxg
+                    kappa = airThermalCond(temp(i,j,k))
+                    betaz(i, j)  = 1. + (dz*h/kappa)
+                    gammaz(i, j) = (dz*h*tempAir)/kappa
+                end do
+            end do
+        end if
+
+    end subroutine setupThermalCoeff
+
 
     subroutine Arrhenius(temp, delt, tissue, zi, zf, numpoints)
 

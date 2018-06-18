@@ -1,8 +1,11 @@
 1000000           nphotons
-0.55              xmax
-0.55              ymax
-0.55              zmax
+0.55              xmax (cm)
+0.55              ymax (cm)
+0.55              zmax (cm)
 1.0             n1
 1.38              n2
-3           iters
-85          power (W)
+50          power (W)
+500.e-3         total_time (s)
+100         loops (how many heat loops to do before redoing MCRT)
+200e-3        pulselength (s)
+10./1.        repetitionRate_1 (Hz)

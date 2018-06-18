@@ -21,15 +21,14 @@ use utils
 
 implicit none
 
-integer           :: nphotons ,iseed, j, xcell, ycell, zcell, N, counter, u, iters,i,k
-logical           :: tflag, flag, end
+integer           :: nphotons ,iseed, j, xcell, ycell, zcell, N, counter, u
+logical           :: tflag
 double precision  :: nscatt, nscattGLOBAL
 real              :: xmax, ymax, zmax, ran, delta, start, finish, ran2, power
-real, allocatable :: temp(:,:,:), tissueGLOBAL(:,:,:), tissue(:,:,:)!, q(:,:,:) 
+real, allocatable :: temp(:,:,:), tissue(:,:,:), tissueGLOBAL(:,:,:) 
 
 ! mpi variables
 type(mpi_comm)   :: comm, new_comm
-type(MPI_Status) :: recv_status
 integer          :: right, left, id, numproc, dims(2), ndims, tag
 logical          :: periods(1), reorder
 
@@ -46,8 +45,8 @@ call directory
 call alloc_array(numproc)
 call zarray
 
-N = 104 ! points for heat sim
-allocate(tissue(nxg, nyg, nzg))!, tissueGLOBAL(nxg,nyg,nzg))!, q(nxg,nyg,nzg))
+N = nzg ! points for heat sim
+allocate(tissue(nxg, nyg, nzg), tissueGLOBAL(nxg,nyg,nzg))!, q(nxg,nyg,nzg))
 allocate(temp(0:N+1, 0:N+1, 0:N+1))
 
 
@@ -57,7 +56,6 @@ repetitionCount = 0.
 laserOn         = 1.
 laser_flag      = .TRUE.
 
-! tissue  = 0.
 counter = 0
 
 !setup topology variables
@@ -83,8 +81,9 @@ open(newunit=u,file=trim(resdir)//'input.params',status='old')
    read(u,*) zmax
    read(u,*) n1
    read(u,*) n2
-   read(u,*) iters
    read(u,*) power
+   ! read(u,*) total_time
+   ! read(u,*) loops
    close(u)
 
 ! set seed for rnd generator. id to change seed for each process
@@ -111,8 +110,6 @@ delta  = 1.e-8*(2.*zmax/nzg)
 nscatt = 0
 call MPI_Barrier(MPI_COMM_WORLD)
 call cpu_time(start)
-flag = .true.
-end = .true.
 !loop over photons 
 print*,'Photons now running on core: ',id
 
@@ -126,7 +123,9 @@ temp(:,N+1,:) = 37.+273.  ! back face
 temp(:,:,0) = 37.+273.  ! bottom face
 temp(:,:,N+1) = 25.+273.  ! top face 
 
-do while(time < .5)
+call initThermalCoeff(7.9400793650793650E-005, N)
+
+do while(time <= 0.3)
    if(laser_flag)then
 
       do j = 1, nphotons
@@ -161,22 +160,45 @@ do while(time < .5)
             call tauint1(xmax,ymax,zmax,xcell,ycell,zcell,tflag,iseed,delta)          
          end do
       end do      ! end loop over nph photons
-      call MPI_REDUCE(jmean, jmeanGLOBAL, (nxg*nyg*nzg),MPI_DOUBLE_PRECISION, MPI_SUM,0,new_comm)
+      call MPI_allREDUCE(jmean, jmeanGLOBAL, (nxg*nyg*nzg),MPI_DOUBLE_PRECISION, MPI_SUM,new_comm)
 
-      jmeanGLOBAL = jmeanGLOBAL * (power/(nphotons*numproc*(2.*xmax/nxg)*(2.*ymax/nyg)*(2.*zmax/nzg)))
+      jmeanGLOBAL = jmeanGLOBAL * (power/(nphotons*numproc*(2.*xmax*1d-2/nxg)*(2.*ymax*1d-2/nyg)*(2.*zmax*1d-2/nzg)))
    end if
 
-   call heat_sim_3d(jmeanGLOBAL, temp, tissue, N, flag, id, numproc, new_comm, right, left, counter)
+   call heat_sim_3d(jmeanGLOBAL, temp, tissue, N, id, numproc, new_comm, right, left, counter)
+
+   tissueGLOBAL = 0.
+
+   call MPI_allREDUCE(tissue, tissueGLOBAL, (nxg*nyg*nzg),MPI_DOUBLE_PRECISION, MPI_SUM,new_comm)
+
+
+   where(tissue >= 6)
+      rhokap = 0.
+   end where
 
    if(id == 0)then
       open(newunit=u,file=trim(fileplace)//"deposit/tissue-"//str(counter)//".dat",access="stream",form="unformatted")
       write(u)tissue
+      close(u)
+
+      open(newunit=u,file=trim(fileplace)//"deposit/rhokap-"//str(counter)//".dat",access="stream",form="unformatted")
+      write(u)rhokap
       close(u)
    end if
 
    counter = counter + 1
    jmean = 0.
 end do
+
+   print*,maxval(temp)-273.
+   call MPI_Finalize()
+   stop
+
+   ! if(id == 0)then
+   !    open(newunit=u,file=trim(fileplace)//"deposit/tissue-"//str(power,5)//".dat",access="stream",form="unformatted")
+   !    write(u)tissue
+   !    close(u)
+   ! end if
 
 call cpu_time(finish)
 if(finish-start.ge.60.)then
