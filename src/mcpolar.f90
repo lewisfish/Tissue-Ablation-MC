@@ -23,9 +23,9 @@ implicit none
 
 integer           :: nphotons ,iseed, j, xcell, ycell, zcell, N, counter, u
 logical           :: tflag
-double precision  :: nscatt, nscattGLOBAL
-real              :: xmax, ymax, zmax, ran, delta, start, finish, ran2, power
-real, allocatable :: temp(:,:,:), tissue(:,:,:), tissueGLOBAL(:,:,:) 
+double precision  :: nscatt
+real              :: xmax, ymax, zmax, ran, delta, start, finish, ran2
+real, allocatable :: temp(:,:,:), tissue(:,:,:), tissueGLOBAL(:,:,:), Q(:,:,:)
 
 ! mpi variables
 type(mpi_comm)   :: comm, new_comm
@@ -47,7 +47,7 @@ call zarray
 
 N = nzg ! points for heat sim
 allocate(tissue(nxg, nyg, nzg), tissueGLOBAL(nxg,nyg,nzg))!, q(nxg,nyg,nzg))
-allocate(temp(0:N+1, 0:N+1, 0:N+1))
+allocate(temp(0:N+1, 0:N+1, 0:N+1), Q(nxg, nyg, nzg))
 
 
 time            = 0.
@@ -81,9 +81,10 @@ open(newunit=u,file=trim(resdir)//'input.params',status='old')
    read(u,*) zmax
    read(u,*) n1
    read(u,*) n2
-   read(u,*) power
-   ! read(u,*) total_time
-   ! read(u,*) loops
+   read(u,*) total_time
+   read(u,*) loops
+   read(u,*) repetitionRate_1
+   read(u,*) energyPerPixel
    close(u)
 
 ! set seed for rnd generator. id to change seed for each process
@@ -113,9 +114,8 @@ call cpu_time(start)
 !loop over photons 
 print*,'Photons now running on core: ',id
 
-
+Q = 0.
 temp = 37 + 273.
-power = power / 49.
 temp(N+1,:,:) = 37.+273.  ! side face
 temp(0,:,:) = 37.+273.    ! side face
 temp(:,0,:) = 37.+273. ! front face
@@ -123,9 +123,11 @@ temp(:,N+1,:) = 37.+273.  ! back face
 temp(:,:,0) = 37.+273.  ! bottom face
 temp(:,:,N+1) = 25.+273.  ! top face 
 
-call initThermalCoeff(7.9400793650793650E-005, N)
+call initThermalCoeff(delt, N)
 
-do while(time <= 0.3)
+print*,energyPerPixel
+
+do while(time <= total_time)
    if(laser_flag)then
 
       do j = 1, nphotons
@@ -162,43 +164,39 @@ do while(time <= 0.3)
       end do      ! end loop over nph photons
       call MPI_allREDUCE(jmean, jmeanGLOBAL, (nxg*nyg*nzg),MPI_DOUBLE_PRECISION, MPI_SUM,new_comm)
 
-      jmeanGLOBAL = jmeanGLOBAL * (power/(nphotons*numproc*(2.*xmax*1d-2/nxg)*(2.*ymax*1d-2/nyg)*(2.*zmax*1d-2/nzg)))
+      jmeanGLOBAL = jmeanGLOBAL * ((60./49.)/(nphotons*numproc*(2.*xmax*1d-2/nxg)*(2.*ymax*1d-2/nyg)*(2.*zmax*1d-2/nzg)))
    end if
 
-   call heat_sim_3d(jmeanGLOBAL, temp, tissue, N, id, numproc, new_comm, right, left, counter)
+   call heat_sim_3d(jmeanGLOBAL, temp, tissue, Q, N, id, numproc, new_comm, right, left, counter)
 
    tissueGLOBAL = 0.
 
    call MPI_allREDUCE(tissue, tissueGLOBAL, (nxg*nyg*nzg),MPI_DOUBLE_PRECISION, MPI_SUM,new_comm)
 
 
-   where(tissue >= 6)
+   where(tissue >= 10000.d0)
       rhokap = 0.
    end where
-
-   if(id == 0)then
-      open(newunit=u,file=trim(fileplace)//"deposit/tissue-"//str(counter)//".dat",access="stream",form="unformatted")
-      write(u)tissue
-      close(u)
-
-      open(newunit=u,file=trim(fileplace)//"deposit/rhokap-"//str(counter)//".dat",access="stream",form="unformatted")
-      write(u)rhokap
-      close(u)
-   end if
 
    counter = counter + 1
    jmean = 0.
 end do
+   if(id == 0)then
+      open(newunit=u,file=trim(fileplace)//"deposit/rhokap-final-noavg-"//str(energyPerPixel,6)//".dat" &
+          ,access="stream",form="unformatted")
+      write(u)rhokap
+      close(u)
 
-   print*,maxval(temp)-273.
-   call MPI_Finalize()
-   stop
+      open(newunit=u,file=trim(fileplace)//"deposit/temp-final-noavg-"//str(energyPerPixel,6)//".dat" &
+          ,access="stream",form="unformatted")
+      write(u)temp
+      close(u)
 
-   ! if(id == 0)then
-   !    open(newunit=u,file=trim(fileplace)//"deposit/tissue-"//str(power,5)//".dat",access="stream",form="unformatted")
-   !    write(u)tissue
-   !    close(u)
-   ! end if
+      open(newunit=u,file=trim(fileplace)//"deposit/tissue-final-noavg-"//str(energyPerPixel,6)//".dat" &
+          ,access="stream",form="unformatted")
+      write(u)tissue
+      close(u)
+   end if
 
 call cpu_time(finish)
 if(finish-start.ge.60.)then
@@ -207,15 +205,15 @@ else
     print*, 'time taken ~',floor(finish-start/60.),'s'
 end if
 
-call mpi_reduce(jmean, jmeanGLOBAL, (nxg*nyg*nzg),MPI_DOUBLE_PRECISION, MPI_SUM,0,new_comm)
+! call mpi_reduce(jmean, jmeanGLOBAL, (nxg*nyg*nzg),MPI_DOUBLE_PRECISION, MPI_SUM,0,new_comm)
 
-call mpi_reduce(nscatt,nscattGLOBAL,1,MPI_DOUBLE_PRECISION,MPI_SUM,0,new_comm)
+! call mpi_reduce(nscatt,nscattGLOBAL,1,MPI_DOUBLE_PRECISION,MPI_SUM,0,new_comm)
 
-if(id == 0)then
-   print*,'Average # of scatters per photon:',(nscattGLOBAL/(nphotons*numproc))
-   call writer(xmax, ymax, zmax, nphotons, numproc)
-   print*,'write done'
-end if
+! if(id == 0)then
+!    print*,'Average # of scatters per photon:',(nscattGLOBAL/(nphotons*numproc))
+!    call writer(xmax, ymax, zmax, nphotons, numproc)
+!    print*,'write done'
+! end if
 
 call MPI_Finalize()
 end program mcpolar

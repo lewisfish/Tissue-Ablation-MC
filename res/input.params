@@ -4,8 +4,7 @@
 0.55              zmax (cm)
 1.0             n1
 1.38              n2
-50          power (W)
-500.e-3         total_time (s)
+2.         total_time (s)
 100         loops (how many heat loops to do before redoing MCRT)
-200e-3        pulselength (s)
-10./1.        repetitionRate_1 (Hz)
+100000./1.        repetitionRate_1 (Hz)
+400          energyPerPixel (mJ)

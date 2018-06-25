@@ -1,5 +1,5 @@
 ifeq ($(FCOMP),mpifort)
-FCFLAGS =  -freal-4-real-8 -O2
+FCFLAGS =  -freal-4-real-8 -O3
 FCDEBUG = -g -fbacktrace -fcheck=all -fbounds-check -ffpe-trap=invalid,overflow,underflow,denormal
 FCBUILD = -Wall -Wextra -pedantic
 else ifeq ($(FCOMP),mpiifort)

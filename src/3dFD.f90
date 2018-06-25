@@ -2,38 +2,40 @@ Module Heat
 
     implicit none
 
-    real    :: pulseCount, repetitionCount, time, laserOn
-    real    :: dx, dy, dz, eta
+    real              :: pulseCount, repetitionCount, time, laserOn, total_time, repetitionRate_1, energyPerPixel
+    real              :: Power=60.d0, pulselength, delt
+    real              :: dx, dy, dz, eta, massVoxel
     real, allocatable :: coeff(:,:,:), rx(:,:,:), ry(:,:,:), rz(:,:,:), gammaz(:,:), betaz(:,:)
-    logical :: laser_flag
+    integer, allocatable :: air(:,:,:)
+    logical           :: laser_flag
+    integer           :: loops
 
     private
-    public :: heat_sim_3D, pulseCount, repetitionCount, laserOn, laser_flag, time, initThermalCoeff
-    public :: coeff, dx, dy, dz, rx, ry, rz, gammaz, betaz, eta
+    public :: heat_sim_3D, pulseCount, repetitionCount, laserOn, laser_flag, time, initThermalCoeff, repetitionRate_1
+    public :: coeff, dx, dy, dz, rx, ry, rz, gammaz, betaz, eta, loops, total_time, energyPerPixel, pulselength,Power
+    public :: delt, air, massVoxel
 
     contains
 
-subroutine heat_sim_3D(jmean, temp, tissue, numpoints, id, numproc, new_comm, right, left, counter)
+subroutine heat_sim_3D(jmean, temp, tissue, Q, numpoints, id, numproc, new_comm, right, left, counter)
 
         use mpi_f08
         use utils,     only : str
-        use constants, only : fileplace, nxg, nyg, nzg
-        use thermalConstants, only : skinDensity, skinThermalCond, skinHeatCap, tempAir4, skinBeta, skinAlpha
+        use thermalConstants, only : tempAir4, skinBeta, skinAlpha, skinDensity,QVapor
 
         implicit none
         
         real,           intent(IN)    :: jmean(:,:,:)
         integer,        intent(IN)    :: numpoints, right, left, id, numproc,counter
         type(mpi_comm), intent(IN)    :: new_comm
-        real,           intent(INOUT) :: temp(0:numpoints+1,0:numpoints+1,0:numpoints+1), tissue(:,:,:)
+        real,           intent(INOUT) :: temp(0:numpoints+1,0:numpoints+1,0:numpoints+1), tissue(:,:,:), Q(:,:,:)
 
         type(MPI_Status) :: recv_status
 
         !heat variables
-        real              :: u_xx, u_yy, u_zz, delt, alpha
-        real              :: pulselength, repetitionRate_1
-        real              :: tim_fin, tim_srt, Q_vapor, L_w, mass_voxel
-        real, allocatable :: T0(:,:,:), jtmp(:,:,:), Ttmp(:,:,:)
+        real              :: u_xx, u_yy, u_zz, delt
+        real              :: tim_srt
+        real, allocatable :: T0(:,:,:), jtmp(:,:,:), Ttmp(:,:,:), qtmp(:,:,:)
         integer           :: i, j, k, p, u, size_x, size_y, size_z, xi, yi, zi, xf, yf, zf, lo, N, o, tag,zsta,zfin
 
         if(id == 0)then
@@ -70,7 +72,9 @@ subroutine heat_sim_3D(jmean, temp, tissue, numpoints, id, numproc, new_comm, ri
         allocate(T0(0:numpoints+1, 0:numpoints+1, zi-1:zf+1))
         allocate(Ttmp(numpoints, numpoints, zi:zf))
         allocate(jtmp(numpoints, numpoints, zi:zf))
+        allocate(Qtmp(numpoints, numpoints, zi:zf))
         t0 = 0.
+        Qtmp = 0.
 
         !split temp up over all processes
         if(id == 0)then
@@ -92,25 +96,26 @@ subroutine heat_sim_3D(jmean, temp, tissue, numpoints, id, numproc, new_comm, ri
         call mpi_scatter(jmean, size(jmean(:,:,zi:zf)), mpi_double_precision, jtmp(:,:,zi:zf), size(jtmp(:,:,zi:zf)), &
                          mpi_double_precision, 0, new_comm)
 
-        ! call mpi_scatter(tissue, size(tissue(:,:,zi:zf)), mpi_double_precision, Ttmp, size(Ttmp(:,:,zi:zf)), &
-        !                  mpi_double_precision, 0, new_comm)
+        call mpi_scatter(tissue, size(tissue(:,:,zi:zf)), mpi_double_precision, Ttmp, size(Ttmp(:,:,zi:zf)), &
+                         mpi_double_precision, 0, new_comm)
 
-        pulselength = 200d-3
-        repetitionRate_1 = 1.d0/1.d0
+        call mpi_scatter(Q, size(Q(:,:,zi:zf)), mpi_double_precision, Qtmp, size(Qtmp(:,:,zi:zf)), &
+                 mpi_double_precision, 0, new_comm)
+
 
         if(pulselength < delt)then
             if(id == 0)print*,"pulselength smaller than timestep, adjusting..."
             delt = pulselength / 2.
         end if
 
-        if(id == 0)print"(a,L)","Laser On: ",laser_flag
+        if(id == 0)print"(a,L1)","Laser On: ",laser_flag
         o = int(1./delt)
         lo = o / 100
-        if(id == 0)print"(a,F9.5,1x,a,I4)","Elapsed Time: ",time, "Loops left: ",int(0.3/(100.*delt)) - counter
+        if(id == 0)print"(a,F9.5,1x,a,I4)","Elapsed Time: ",time, "Loops left: ",int(total_time/(100.*delt)) - counter
         call cpu_time(tim_srt)
-        do p = 1, 100
+        do p = 1, loops
             
-            if(mod(p, 10) == 0 .and. id == 0) print*,p!,"*************MAX*************",maxval(temp)-273.!write(*,FMT="(A8,t21)",advance='no') achar(13)//str(real(p)/real(o)*100., 5)//' %'
+            if(mod(p, 10) == 0 .and. id == 0) print*,p
 
             do k = zi, zf
                 do j = yi, yf
@@ -123,7 +128,12 @@ subroutine heat_sim_3D(jmean, temp, tissue, numpoints, id, numproc, new_comm, ri
                         end if
                         u_yy = ry(i,j-1,k)*t0(i, j - 1, k    ) + (1.-2.*ry(i,j,k)) * t0(i, j, k) + ry(i,j+1,k)*t0(i, j + 1, k)
                         u_xx = rx(i-1,j,k)*t0(i - 1, j, k    ) + (1.-2.*rx(i,j,k)) * t0(i, j, k) + rx(i+1,j,k)*t0(i + 1, j, k)
-                        t0(i,j,k) = (u_xx + u_yy + u_zz)/3. + laserOn*coeff(i,j,k)*jtmp(i,j,k)
+                        ! if(t0(i,j,k) >= 100. + 273. .and. t0(i,j,k) <= 100.0001 + 273. .and. Qtmp(i,j,k) < QVapor)then
+                        !     Qtmp(i,j,k) = Qtmp(i,j,k) + &
+                        !     laserOn*jtmp(i,j,k)*delt*air(i,j,k)*skinDensity * massVoxel
+                        ! else
+                            t0(i,j,k) = (u_xx + u_yy + u_zz) + laserOn*coeff(i,j,k)*jtmp(i,j,k)
+                        ! end if
                     end do
                 end do
             end do
@@ -152,23 +162,30 @@ subroutine heat_sim_3D(jmean, temp, tissue, numpoints, id, numproc, new_comm, ri
             pulseCount = pulseCount + delt
             repetitionCount = repetitionCount + delt
             time = time + delt
+            call Arrhenius(t0, time, Ttmp, zi, zf, numpoints)
         end do
 
         call mpi_gather(t0(:,:,zi:zf), size(t0(:,:,zi:zf)), mpi_double_precision, &
                         temp(:,:,zi:zf), size(temp(:,:,zi:zf)), mpi_double_precision, 0, new_comm)
 
-        call Arrhenius(temp(1:numpoints,1:numpoints,1:numpoints), time, tissue, zi, zf, numpoints)
+        call mpi_gather(Ttmp, size(Ttmp), mpi_double_precision, &
+                        tissue(:,:,zi:zf), size(tissue(:,:,zi:zf)), mpi_double_precision,0, new_comm)
 
-        ! call mpi_gather(Ttmp, size(Ttmp), mpi_double_precision, &
-        !                 tissue(:,:,zi:zf), size(tissue(:,:,zi:zf)), mpi_double_precision,0, new_comm)
+        call mpi_gather(Qtmp, size(Qtmp), mpi_double_precision, &
+                        Q(:,:,zi:zf), size(Q(:,:,zi:zf)), mpi_double_precision,0, new_comm)
 
         !send data to master process and do I/O
-        if(id == 0)then
-            open(newunit=u,file=trim(fileplace)//'deposit/temp-'//str(counter)//"-"//str(time,5)//'.dat',access='stream', &
-                 form='unformatted',status='replace')
-            write(u)temp(1:numpoints,1:numpoints,1:numpoints) - 273.
-            close(u)
-        end if
+        ! if(id == 0)then
+            ! open(newunit=u,file=trim(fileplace)//'deposit/temp-'//str(counter)//"-"//str(time,5)//'.dat',access='stream', &
+            !      form='unformatted',status='replace')
+            ! write(u)temp(1:numpoints,1:numpoints,1:numpoints) - 273.
+            ! close(u)
+
+            ! open(newunit=u,file=trim(fileplace)//'deposit/tissue-'//str(counter)//"-"//str(time,5)//'.dat',access='stream', &
+            !      form='unformatted',status='replace')
+            ! write(u)100.*(1.-exp(-tissue))
+            ! close(u)
+        ! end if
         ! deallocate(t0, jtmp)
    end subroutine heat_sim_3D
 
@@ -180,8 +197,8 @@ subroutine heat_sim_3D(jmean, temp, tissue, numpoints, id, numproc, new_comm, ri
 
         implicit none
 
-        real,    intent(IN) :: delt
-        integer, intent(IN) :: numpoints
+        real,    intent(INOUT) :: delt
+        integer, intent(IN)    :: numpoints
 
         real :: alpha
 
@@ -195,7 +212,11 @@ subroutine heat_sim_3D(jmean, temp, tissue, numpoints, id, numproc, new_comm, ri
 
         allocate(coeff(0:nxg+1,0:nyg+1,0:nzg+1))
         allocate(rx(0:nxg+1,0:nyg+1,0:nzg+1), ry(0:nxg+1,0:nyg+1,0:nzg+1), rz(0:nxg+1,0:nyg+1,0:nzg+1))
-        allocate(gammaz(nxg, nyg), betaz(nxg, nyg), )
+        allocate(gammaz(nxg, nyg), betaz(nxg, nyg))
+        allocate(air(nxg,nyg,nzg))
+
+        delt = dx**2/(6.*skinAlpha*skinBeta)
+        delt = delt / 100.
 
         coeff = 0.
         coeff(1:nxg,1:nyg,1:nzg) = skinAlpha * delt/skinThermalCond
@@ -212,6 +233,11 @@ subroutine heat_sim_3D(jmean, temp, tissue, numpoints, id, numproc, new_comm, ri
         rx(:,:,nzg+1) = alpha * delt/(dx**2)
         ry(:,:,nzg+1) = alpha * delt/(dy**2)
         rz(:,:,nzg+1) = alpha * delt/(dz**2)
+
+        pulseLength = (energyPerPixel * 1d-3 * 81.d0) / Power
+
+        massVoxel = skinDensity*(2.*0.55d-2/nxg)**3
+        QVapor = lw * massVoxel
 
     end subroutine initThermalCoeff
 
@@ -233,7 +259,8 @@ subroutine heat_sim_3D(jmean, temp, tissue, numpoints, id, numproc, new_comm, ri
         do k = 1, nzg
             do j = 1, nyg
                 do i = 1, nxg
-                    if(rhokap(i,j,k) <= 0.)then
+                    if(rhokap(i,j,k) <= 1.)then
+                        air(i,j,k) = 0
                         kappa = airThermalCond(temp(i,j,k))
                         ! alpha = kappa / (rho * c_heat)
                         alphaAir = kappa / (airDensity(temp(i,j,k)) * airHeatCap)
@@ -268,43 +295,43 @@ subroutine heat_sim_3D(jmean, temp, tissue, numpoints, id, numproc, new_comm, ri
         real,    intent(IN)    :: temp(:,:,:), delt
         real,    intent(INOUT) :: tissue(:,:,:)
 
-        ! double precision :: a, g, r
-        integer          :: i,j,k
+        double precision :: a, g, r
+        integer          :: x,y,z
 
-        ! a = 3.1d91!2.9e27
-        ! g = 6.28e5!2.4e5
-        ! r = 8.314
+        a = 3.1d91!2.9e27
+        g = 6.28e5!2.4e5
+        r = 8.314
 
-        do k = 1, size(temp,3)
-            do j = 1, size(temp,2)
-                do i = 1, size(temp,1)
-                    if(temp(i,j,k) >= 600.+273. .and. temp(i,j,k) < 700.+273 .and. tissue(i,j,k) < 6)then
-                        tissue(i,j,k) = 6.!tissue + time*A*exp(-G/(R*(temp+273.)))
-                    elseif(temp(i,j,k) >= 500.+273. .and. temp(i,j,k) < 600.+273 .and. tissue(i,j,k) < 5)then
-                        tissue(i,j,k) = 5.
-                    elseif(temp(i,j,k) >= 400.+273. .and. temp(i,j,k) < 500.+273 .and. tissue(i,j,k) < 4)then
-                        tissue(i,j,k) = 4.
-                    elseif(temp(i,j,k) >= 300.+273. .and. temp(i,j,k) < 400.+273 .and. tissue(i,j,k) < 3)then
-                        tissue(i,j,k) = 3.
-                    elseif(temp(i,j,k) >= 200.+273. .and. temp(i,j,k) < 300.+273 .and. tissue(i,j,k) < 2)then
-                        tissue(i,j,k) = 2.
-                    elseif(temp(i,j,k) >= 100+273 .and. temp(i,j,k) < 200.+273 .and. tissue(i,j,k) < 1)then
-                        tissue(i,j,k) = 1.
-                    elseif(temp(i,j,k) >= 44+273 .and. temp(i,j,k) < 100+273 .and. tissue(i,j,k) < 1)then
-                        tissue(i,j,k) = 0.
-                    end if
-                end do
-            end do
-        end do
-        ! do z = zi, zf
-        !     do y = 1, numpoints
-        !         do x = 1, numpoints
-        !             if(temp(x, y, z) >= 44)then
-        !                 tissue(x, y, z) = tissue(x, y, z) + delt*A*exp(-G/(R*(temp(x,y,z)+273)))
+        ! do k = 1, size(temp,3)
+        !     do j = 1, size(temp,2)
+        !         do i = 1, size(temp,1)
+        !             if(temp(i,j,k) >= 600.+273. .and. temp(i,j,k) < 700.+273 .and. tissue(i,j,k) < 6)then
+        !                 tissue(i,j,k) = 6.!tissue + time*A*exp(-G/(R*(temp+273.)))
+        !             elseif(temp(i,j,k) >= 500.+273. .and. temp(i,j,k) < 600.+273 .and. tissue(i,j,k) < 5)then
+        !                 tissue(i,j,k) = 5.
+        !             elseif(temp(i,j,k) >= 400.+273. .and. temp(i,j,k) < 500.+273 .and. tissue(i,j,k) < 4)then
+        !                 tissue(i,j,k) = 4.
+        !             elseif(temp(i,j,k) >= 300.+273. .and. temp(i,j,k) < 400.+273 .and. tissue(i,j,k) < 3)then
+        !                 tissue(i,j,k) = 3.
+        !             elseif(temp(i,j,k) >= 200.+273. .and. temp(i,j,k) < 300.+273 .and. tissue(i,j,k) < 2)then
+        !                 tissue(i,j,k) = 2.
+        !             elseif(temp(i,j,k) >= 100+273 .and. temp(i,j,k) < 200.+273 .and. tissue(i,j,k) < 1)then
+        !                 tissue(i,j,k) = 1.
+        !             elseif(temp(i,j,k) >= 44+273 .and. temp(i,j,k) < 100+273 .and. tissue(i,j,k) < 1)then
+        !                 tissue(i,j,k) = 0.
         !             end if
         !         end do
         !     end do
         ! end do
+        do z = zi, zf
+            do y = 1, numpoints
+                do x = 1, numpoints
+                    if(temp(x, y, z) >= 44+273.)then
+                        tissue(x, y, z) = tissue(x, y, z) + delt*A*exp(-G/(R*(temp(x,y,z))))
+                    end if
+                end do
+            end do
+        end do
 
     end subroutine  Arrhenius
 end Module Heat
