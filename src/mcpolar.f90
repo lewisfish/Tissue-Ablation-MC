@@ -164,7 +164,7 @@ do while(time <= total_time)
       end do      ! end loop over nph photons
       call MPI_allREDUCE(jmean, jmeanGLOBAL, (nxg*nyg*nzg),MPI_DOUBLE_PRECISION, MPI_SUM,new_comm)
 
-      jmeanGLOBAL = jmeanGLOBAL * ((60./49.)/(nphotons*numproc*(2.*xmax*1d-2/nxg)*(2.*ymax*1d-2/nyg)*(2.*zmax*1d-2/nzg)))
+      jmeanGLOBAL = jmeanGLOBAL * ((60.)/(nphotons*numproc*(2.*xmax*1d-2/nxg)*(2.*ymax*1d-2/nyg)*(2.*zmax*1d-2/nzg)))
    end if
 
    call heat_sim_3d(jmeanGLOBAL, temp, tissue, Q, N, id, numproc, new_comm, right, left, counter)
@@ -182,17 +182,17 @@ do while(time <= total_time)
    jmean = 0.
 end do
    if(id == 0)then
-      open(newunit=u,file=trim(fileplace)//"deposit/rhokap-final-noavg-"//str(energyPerPixel,6)//".dat" &
+      open(newunit=u,file=trim(fileplace)//"deposit/rhokap-final-test-"//str(energyPerPixel,6)//".dat" &
           ,access="stream",form="unformatted")
       write(u)rhokap
       close(u)
 
-      open(newunit=u,file=trim(fileplace)//"deposit/temp-final-noavg-"//str(energyPerPixel,6)//".dat" &
+      open(newunit=u,file=trim(fileplace)//"deposit/temp-final-test-"//str(energyPerPixel,6)//".dat" &
           ,access="stream",form="unformatted")
       write(u)temp
       close(u)
 
-      open(newunit=u,file=trim(fileplace)//"deposit/tissue-final-noavg-"//str(energyPerPixel,6)//".dat" &
+      open(newunit=u,file=trim(fileplace)//"deposit/tissue-final-test-"//str(energyPerPixel,6)//".dat" &
           ,access="stream",form="unformatted")
       write(u)tissue
       close(u)

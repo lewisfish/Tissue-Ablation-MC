@@ -21,7 +21,7 @@ subroutine heat_sim_3D(jmean, temp, tissue, Q, numpoints, id, numproc, new_comm,
 
         use mpi_f08
         use utils,     only : str
-        use thermalConstants, only : tempAir4, skinBeta, skinAlpha, skinDensity,QVapor
+        use thermalConstants, only : tempAir4, skinBeta, skinAlpha, skinDensity, skinThermalCond, h, tempAir, QVapor
 
         implicit none
         
@@ -34,7 +34,7 @@ subroutine heat_sim_3D(jmean, temp, tissue, Q, numpoints, id, numproc, new_comm,
 
         !heat variables
         real              :: u_xx, u_yy, u_zz, delt
-        real              :: tim_srt
+        real              :: tim_srt, Q_vapor, L_w
         real, allocatable :: T0(:,:,:), jtmp(:,:,:), Ttmp(:,:,:), qtmp(:,:,:)
         integer           :: i, j, k, p, u, size_x, size_y, size_z, xi, yi, zi, xf, yf, zf, lo, N, o, tag,zsta,zfin
 
@@ -121,19 +121,22 @@ subroutine heat_sim_3D(jmean, temp, tissue, Q, numpoints, id, numproc, new_comm,
                 do j = yi, yf
                     do i = xi, xf
                         if(k == zf .and. id == numproc-1)then!B.Cs
-                        u_zz = (1.-2.*rz(i,j,k)*betaz(i,j)) * t0(i,j,k) + (2. *rz (i,j,k+1)* t0(i,j,k+1)) + &
-                               (2. * rz(i,j,k) * gammaz(i,j)) - 2.*rz(i,j,k)*eta*betaz(i,j)*(t0(i,j,k)**4-tempAir4)
+                        u_zz = (skinalpha / dx**2) * ((2.*dx / skinThermalCond) * (-h*(t0(i,j,k) - tempAir) - eta*(t0(i,j,k)**4 - &
+                                tempAir4)) - 2. * t0(i, j, k) + 2.*t0(i, j, k + 1))
                         else
-                            u_zz = rz(i,j,k-1)*t0(i, j,     k - 1) + (1.-2.*rz(i,j,k)) * t0(i, j, k) + rz(i,j,k+1)*t0(i, j, k + 1)
+                        u_zz = (skinAlpha / dz**2) * (t0(i, j,     k - 1) - 2. * t0(i, j, k) + t0(i, j, k + 1))
                         end if
-                        u_yy = ry(i,j-1,k)*t0(i, j - 1, k    ) + (1.-2.*ry(i,j,k)) * t0(i, j, k) + ry(i,j+1,k)*t0(i, j + 1, k)
-                        u_xx = rx(i-1,j,k)*t0(i - 1, j, k    ) + (1.-2.*rx(i,j,k)) * t0(i, j, k) + rx(i+1,j,k)*t0(i + 1, j, k)
-                        ! if(t0(i,j,k) >= 100. + 273. .and. t0(i,j,k) <= 100.0001 + 273. .and. Qtmp(i,j,k) < QVapor)then
-                        !     Qtmp(i,j,k) = Qtmp(i,j,k) + &
-                        !     laserOn*jtmp(i,j,k)*delt*air(i,j,k)*skinDensity * massVoxel
-                        ! else
-                            t0(i,j,k) = (u_xx + u_yy + u_zz) + laserOn*coeff(i,j,k)*jtmp(i,j,k)
-                        ! end if
+                        
+                        u_xx = (skinAlpha / dx**2) * (t0(i - 1, j, k    ) - 2. * t0(i, j, k) + t0(i + 1, j, k))
+                        u_yy = (skinAlpha / dy**2) * (t0(i, j - 1, k    ) - 2. * t0(i, j, k) + t0(i, j + 1, k))
+
+                        if(t0(i,j,k) >= 100. + 273. .and. Qtmp(i,j,k) < QVapor)then
+                            Qtmp(i,j,k) = Qtmp(i,j,k) + &
+                            laserOn*jtmp(i,j,k)*delt*air(i,j,k)*skinDensity * massVoxel
+                            t0(i,j,k) = 100. + 273.
+                        else
+                            t0(i,j,k) = delt * (u_xx + u_yy + u_zz) + t0(i,j,k) + laserOn*coeff(i,j,k)*jtmp(i,j,k)
+                        end if
                     end do
                 end do
             end do
@@ -171,8 +174,8 @@ subroutine heat_sim_3D(jmean, temp, tissue, Q, numpoints, id, numproc, new_comm,
         call mpi_gather(Ttmp, size(Ttmp), mpi_double_precision, &
                         tissue(:,:,zi:zf), size(tissue(:,:,zi:zf)), mpi_double_precision,0, new_comm)
 
-        call mpi_gather(Qtmp, size(Qtmp), mpi_double_precision, &
-                        Q(:,:,zi:zf), size(Q(:,:,zi:zf)), mpi_double_precision,0, new_comm)
+        call mpi_allgather(Qtmp, size(Qtmp), mpi_double_precision, &
+                        Q(:,:,zi:zf), size(Q(:,:,zi:zf)), mpi_double_precision, new_comm)
 
         !send data to master process and do I/O
         ! if(id == 0)then
