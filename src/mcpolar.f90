@@ -162,19 +162,19 @@ do while(time <= total_time)
             call tauint1(xmax,ymax,zmax,xcell,ycell,zcell,tflag,iseed,delta)          
          end do
       end do      ! end loop over nph photons
-      call MPI_allREDUCE(jmean, jmeanGLOBAL, (nxg*nyg*nzg),MPI_DOUBLE_PRECISION, MPI_SUM,new_comm)
+      call MPI_REDUCE(jmean, jmeanGLOBAL, (nxg*nyg*nzg),MPI_DOUBLE_PRECISION, MPI_SUM,0,new_comm)
 
-      jmeanGLOBAL = jmeanGLOBAL * ((60.)/(nphotons*numproc*(2.*xmax*1d-2/nxg)*(2.*ymax*1d-2/nyg)*(2.*zmax*1d-2/nzg)))
+      jmeanGLOBAL = jmeanGLOBAL * ((60./49.)/(nphotons*numproc*(2.*xmax*1d-2/nxg)*(2.*ymax*1d-2/nyg)*(2.*zmax*1d-2/nzg)))
    end if
 
    call heat_sim_3d(jmeanGLOBAL, temp, tissue, Q, N, id, numproc, new_comm, right, left, counter)
 
    tissueGLOBAL = 0.
 
-   call MPI_allREDUCE(tissue, tissueGLOBAL, (nxg*nyg*nzg),MPI_DOUBLE_PRECISION, MPI_SUM,new_comm)
+   ! call MPI_allREDUCE(tissue, tissueGLOBAL, (nxg*nyg*nzg),MPI_DOUBLE_PRECISION, MPI_SUM,new_comm)
 
-
-   where(tissue >= 10000.d0)
+   !500,450,330
+   where(temp >= 330.d0 + 273.d0)
       rhokap = 0.
    end where
 
@@ -182,18 +182,18 @@ do while(time <= total_time)
    jmean = 0.
 end do
    if(id == 0)then
-      open(newunit=u,file=trim(fileplace)//"deposit/rhokap-final-test-"//str(energyPerPixel,6)//".dat" &
-          ,access="stream",form="unformatted")
+      open(newunit=u,file=trim(fileplace)//"deposit/rhokap-final-330-"//str(energyPerPixel,6)//".dat" &
+          ,access="stream",form="unformatted", status="replace")
       write(u)rhokap
       close(u)
 
-      open(newunit=u,file=trim(fileplace)//"deposit/temp-final-test-"//str(energyPerPixel,6)//".dat" &
-          ,access="stream",form="unformatted")
-      write(u)temp
+      open(newunit=u,file=trim(fileplace)//"deposit/temp-final-330-"//str(energyPerPixel,6)//".dat" &
+          ,access="stream",form="unformatted", status="replace")
+      write(u)temp(1:N,1:n,1:n) - 273.
       close(u)
 
-      open(newunit=u,file=trim(fileplace)//"deposit/tissue-final-test-"//str(energyPerPixel,6)//".dat" &
-          ,access="stream",form="unformatted")
+      open(newunit=u,file=trim(fileplace)//"deposit/tissue-final-330-"//str(energyPerPixel,6)//".dat" &
+          ,access="stream",form="unformatted", status="replace")
       write(u)tissue
       close(u)
    end if

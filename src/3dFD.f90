@@ -5,14 +5,14 @@ Module Heat
     real              :: pulseCount, repetitionCount, time, laserOn, total_time, repetitionRate_1, energyPerPixel
     real              :: Power=60.d0, pulselength, delt
     real              :: dx, dy, dz, eta, massVoxel
-    real, allocatable :: coeff(:,:,:), rx(:,:,:), ry(:,:,:), rz(:,:,:), gammaz(:,:), betaz(:,:)
+    real, allocatable :: coeff(:,:,:), alpha(:,:,:)
     integer, allocatable :: air(:,:,:)
     logical           :: laser_flag
     integer           :: loops
 
     private
     public :: heat_sim_3D, pulseCount, repetitionCount, laserOn, laser_flag, time, initThermalCoeff, repetitionRate_1
-    public :: coeff, dx, dy, dz, rx, ry, rz, gammaz, betaz, eta, loops, total_time, energyPerPixel, pulselength,Power
+    public :: coeff, dx, dy, dz, eta, loops, total_time, energyPerPixel, pulselength,Power, alpha
     public :: delt, air, massVoxel
 
     contains
@@ -21,7 +21,8 @@ subroutine heat_sim_3D(jmean, temp, tissue, Q, numpoints, id, numproc, new_comm,
 
         use mpi_f08
         use utils,     only : str
-        use thermalConstants, only : tempAir4, skinBeta, skinAlpha, skinDensity, skinThermalCond, h, tempAir, QVapor
+        use constants, only : fileplace
+        use thermalConstants, only : tempAir4, skinBeta, skinAlpha, skinDensity, skinThermalCond, h, tempAir, QVapor, skinheatCap
 
         implicit none
         
@@ -121,18 +122,23 @@ subroutine heat_sim_3D(jmean, temp, tissue, Q, numpoints, id, numproc, new_comm,
                 do j = yi, yf
                     do i = xi, xf
                         if(k == zf .and. id == numproc-1)then!B.Cs
-                        u_zz = (skinalpha / dx**2) * ((2.*dx / skinThermalCond) * (-h*(t0(i,j,k) - tempAir) - eta*(t0(i,j,k)**4 - &
-                                tempAir4)) - 2. * t0(i, j, k) + 2.*t0(i, j, k + 1))
+                        u_zz = (alpha(i,j,k) / dx**2) * ((2.*dx / skinThermalCond) * (-h*dx*dy*(t0(i,j,k) - tempAir) - &
+                                eta*(t0(i,j,k)**4 - tempAir4)) - 2. * t0(i, j, k) + 2.*t0(i, j, k + 1))
                         else
-                        u_zz = (skinAlpha / dz**2) * (t0(i, j,     k - 1) - 2. * t0(i, j, k) + t0(i, j, k + 1))
+                        u_zz = (1.d0 / dz**2) * (alpha(i,j,k-1) * t0(i, j,     k - 1) - 2. * alpha(i,j,k) * t0(i, j, k) + &
+                                alpha(i,j,k+1) * t0(i, j, k + 1))
                         end if
                         
-                        u_xx = (skinAlpha / dx**2) * (t0(i - 1, j, k    ) - 2. * t0(i, j, k) + t0(i + 1, j, k))
-                        u_yy = (skinAlpha / dy**2) * (t0(i, j - 1, k    ) - 2. * t0(i, j, k) + t0(i, j + 1, k))
+                        u_xx = (1.d0 / dx**2) * (alpha(i-1,j,k) * t0(i - 1, j, k    ) - 2. *alpha(i,j,k) * t0(i, j, k) + &
+                                alpha(i+1,j,k) * t0(i + 1, j, k))
+
+                        u_yy = (1.d0 / dy**2) * (alpha(i,j-1,k) * t0(i, j - 1, k    ) - 2. *alpha(i,j,k) * t0(i, j, k) + &
+                                alpha(i,j+1,k) * t0(i, j + 1, k))
 
                         if(t0(i,j,k) >= 100. + 273. .and. Qtmp(i,j,k) < QVapor)then
                             Qtmp(i,j,k) = Qtmp(i,j,k) + &
-                            laserOn*jtmp(i,j,k)*delt*air(i,j,k)*skinDensity * massVoxel
+                            laserOn*jtmp(i,j,k)*delt*skinDensity * massVoxel + &
+                            (skinheatCap * massVoxel * (delt * (u_xx + u_yy + u_zz)))
                             t0(i,j,k) = 100. + 273.
                         else
                             t0(i,j,k) = delt * (u_xx + u_yy + u_zz) + t0(i,j,k) + laserOn*coeff(i,j,k)*jtmp(i,j,k)
@@ -168,18 +174,18 @@ subroutine heat_sim_3D(jmean, temp, tissue, Q, numpoints, id, numproc, new_comm,
             call Arrhenius(t0, time, Ttmp, zi, zf, numpoints)
         end do
 
-        call mpi_gather(t0(:,:,zi:zf), size(t0(:,:,zi:zf)), mpi_double_precision, &
-                        temp(:,:,zi:zf), size(temp(:,:,zi:zf)), mpi_double_precision, 0, new_comm)
+        call mpi_allgather(t0(:,:,zi:zf), size(t0(:,:,zi:zf)), mpi_double_precision, &
+                        temp(:,:,zi:zf), size(temp(:,:,zi:zf)), mpi_double_precision, new_comm)
 
-        call mpi_gather(Ttmp, size(Ttmp), mpi_double_precision, &
-                        tissue(:,:,zi:zf), size(tissue(:,:,zi:zf)), mpi_double_precision,0, new_comm)
+        call mpi_allgather(Ttmp, size(Ttmp), mpi_double_precision, &
+                        tissue(:,:,zi:zf), size(tissue(:,:,zi:zf)), mpi_double_precision, new_comm)
 
         call mpi_allgather(Qtmp, size(Qtmp), mpi_double_precision, &
                         Q(:,:,zi:zf), size(Q(:,:,zi:zf)), mpi_double_precision, new_comm)
 
         !send data to master process and do I/O
         ! if(id == 0)then
-            ! open(newunit=u,file=trim(fileplace)//'deposit/temp-'//str(counter)//"-"//str(time,5)//'.dat',access='stream', &
+            ! open(newunit=u,file=trim(fileplace)//'deposit/t/temp-'//str(counter)//"-"//str(time,5)//'.dat',access='stream', &
             !      form='unformatted',status='replace')
             ! write(u)temp(1:numpoints,1:numpoints,1:numpoints) - 273.
             ! close(u)
@@ -203,39 +209,26 @@ subroutine heat_sim_3D(jmean, temp, tissue, Q, numpoints, id, numproc, new_comm,
         real,    intent(INOUT) :: delt
         integer, intent(IN)    :: numpoints
 
-        real :: alpha
-
         dx = 2.d0 * .55d-2 / (numpoints + 2)
         dy = 2.d0 * .55d-2 / (numpoints + 2)
         dz = 2.d0 * .55d-2 / (numpoints + 2)  
 
         skinBeta = 1.d0 + (dz*h/skinThermalCond)
 
-        eta = eps*S_B_Constant*dx*dy
+        eta = eps*S_B_Constant*dx*dy !$\varepsilon \sigma A$
 
-        allocate(coeff(0:nxg+1,0:nyg+1,0:nzg+1))
-        allocate(rx(0:nxg+1,0:nyg+1,0:nzg+1), ry(0:nxg+1,0:nyg+1,0:nzg+1), rz(0:nxg+1,0:nyg+1,0:nzg+1))
-        allocate(gammaz(nxg, nyg), betaz(nxg, nyg))
+        allocate(coeff(0:nxg+1, 0:nyg+1, 0:nzg+1))
+        allocate(alpha(0:nxg+1, 0:nyg+1, 0:nzg+1))
         allocate(air(nxg,nyg,nzg))
+
+        alpha = skinAlpha
+        alpha(:,:,nzg+1) = airThermalCond(25.+273) / (airDensity(25.+273.) * airHeatCap) 
 
         delt = dx**2/(6.*skinAlpha*skinBeta)
         delt = delt / 100.
 
         coeff = 0.
         coeff(1:nxg,1:nyg,1:nzg) = skinAlpha * delt/skinThermalCond
-
-        rx = skinAlpha * delt/(dx**2)
-        ry = skinAlpha * delt/(dy**2)
-        rz = skinAlpha * delt/(dz**2)
-
-        betaz = 1. + (dz*h/skinThermalCond)
-        gammaz = dz*h*tempAir/skinThermalCond
-
-        alpha = airThermalCond(25.) / (airDensity(25.) *  airHeatCap)
-
-        rx(:,:,nzg+1) = alpha * delt/(dx**2)
-        ry(:,:,nzg+1) = alpha * delt/(dy**2)
-        rz(:,:,nzg+1) = alpha * delt/(dz**2)
 
         pulseLength = (energyPerPixel * 1d-3 * 81.d0) / Power
 
@@ -267,26 +260,11 @@ subroutine heat_sim_3D(jmean, temp, tissue, Q, numpoints, id, numproc, new_comm,
                         kappa = airThermalCond(temp(i,j,k))
                         ! alpha = kappa / (rho * c_heat)
                         alphaAir = kappa / (airDensity(temp(i,j,k)) * airHeatCap)
-                        ! rn = alpha * delt/(dn**2)
-                        rx(i,j,k) = alphaAir * delt / (dx**2) 
-                        ry(i,j,k) = alphaAir * delt / (dy**2)
-                        rz(i,j,k) = alphaAir * delt / (dz**2)
                         coeff(i,j,k) = alphaAir*delt/ kappa 
                     end if
                 end do
             end do
         end do
-
-        if(id == numproc-1)then
-            do j = 1, nyg
-                do i = 1, nxg
-                    kappa = airThermalCond(temp(i,j,k))
-                    betaz(i, j)  = 1. + (dz*h/kappa)
-                    gammaz(i, j) = (dz*h*tempAir)/kappa
-                end do
-            end do
-        end if
-
     end subroutine setupThermalCoeff
 
 

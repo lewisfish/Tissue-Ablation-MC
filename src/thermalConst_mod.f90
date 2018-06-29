@@ -6,11 +6,15 @@ module thermalConstants
     real, parameter :: airHeatCap=1.006d3, tempAir=25.d0+273.d0, tempAir4=tempAir**4
     real, parameter :: S_B_Constant=5.670367d-8, h=10.d0, eps=0.98d0,lw=2256.d3
     real, parameter :: skinAlpha=skinThermalCond/(skinDensity * skinHeatCap)
-    real            :: skinBeta,QVapor
+    real, parameter :: carbonDensity=25.d0,carbonThermalCond=0.005d0,carbonHeatCap=670.d0!kg/m3, Wm-1k-1, Jkg-1k-1
+    real, parameter :: waterContent=.80!%
+    real            :: skinBeta, QVapor
 
     !skinDensity    : 1020 Kg/m3    source 10.1109/TBME.2009.2033464  burn papers says: 1093-1190
     !skinThermalCond: 0.21 W/m K    source burn paper- pig skin
     !skinHeatCap    : 3349 J/Kg K   source burn paper- pig skin
+
+    !carbon source mackenzie 1986
 
     !airHeatCap: J/kg K  source engineeringtoolbox.com 
 
@@ -44,6 +48,18 @@ module thermalConstants
             airDensity = pressue1ATM / (Rspec * T)
 
         end function airDensity
+
+
+        real function getWaterContent(current, Qcurrent)
+
+            implicit none
+
+            real, intent(IN) :: current, Qcurrent
+
+            getWaterContent = current - waterContent * (Qcurrent / QVapor)
+
+        end function getWaterContent
+
 end module thermalConstants
 
         !init heat variables for medium
