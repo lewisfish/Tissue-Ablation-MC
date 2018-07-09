@@ -1,7 +1,7 @@
 1000000           nphotons
-0.55              xmax (cm)
-0.55              ymax (cm)
-0.55              zmax (cm)
+.55              xmax (cm)
+.55              ymax (cm)
+0.25              zmax (cm)
 1.0             n1
 1.38              n2
 2.         total_time (s)

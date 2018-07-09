@@ -23,16 +23,16 @@ CONTAINS
 
    gridWidth   = 2. * xmax!cm
    gridHeight   = 2. * ymax!cm
-   spotsPerRow = 7
-   spotsPerCol = 7
+   spotsPerRow = 9
+   spotsPerCol = 9
    spotsTotal  = spotsPerRow * spotsPerCol
    spotSize    = 250d-4 !um
-   spotGapRow  = (gridWidth - (spotsPerRow * spotSize)) / (spotsPerRow + 1.)
-   spotGapCol  = (gridHeight - (spotsPercol * spotSize)) / (spotsPerCol + 1.) 
+   spotGapRow  = (gridWidth - (spotsPerRow * spotSize/2.)) / (spotsPerRow)
+   spotGapCol  = (gridHeight - (spotsPercol * spotSize/2.)) / (spotsPerCol) 
 
    !centre pixels
-   adjustFactorRow = abs((nint(7./2.) * spotGapRow) + (spotSize/2.) - xmax)
-   adjustFactorCol = abs((nint(7./2.) * spotGapcol) + (spotSize/2.) - ymax)
+   adjustFactorRow = abs((nint(spotsPerRow/2.) * spotGapRow) - xmax)
+   adjustFactorCol = abs((nint(spotsPerCol/2.) * spotGapcol) - ymax)
 
    !get random integer between 1 and spotsPer
    ranx = int(ran2(iseed) * real(spotsPerRow)) + 1

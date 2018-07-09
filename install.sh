@@ -78,7 +78,7 @@ function run
   echo $(pwd)
   mv mcgrid "$bdirc" && echo " "&& echo "*****Install complete*****" && echo " "
 
-  clear
+  # clear
   cd ../bin
 
   if [ "$NUM_CORES" = "1" ]; then
@@ -87,7 +87,7 @@ function run
     if [ $comp = 'gnu' ];then
       /usr/local/bin/mpirun -n $NUM_CORES ./mcgrid
     elif [ $comp = 'intel' ];then
-      mpirun -n $NUM_CORES ./mcgrid
+      mpirun -trace -n $NUM_CORES ./mcgrid
     fi
   fi
 }

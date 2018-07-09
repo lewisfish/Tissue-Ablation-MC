@@ -71,7 +71,7 @@ save
             inquire(iolength=i)zface(:)
             call chck_mem(cnt, i, limit, 'zface', numproc)
 
-            allocate(rhokap(nxg,nyg,nzg))
+            allocate(rhokap(0:nxg+1,0:nyg+1,0:nzg+1))
             inquire(iolength=i)rhokap(:,:,:)
             call chck_mem(cnt, i, limit, 'rhokap', numproc)
 

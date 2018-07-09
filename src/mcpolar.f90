@@ -25,7 +25,7 @@ integer           :: nphotons ,iseed, j, xcell, ycell, zcell, N, counter, u
 logical           :: tflag
 double precision  :: nscatt
 real              :: xmax, ymax, zmax, ran, delta, start, finish, ran2
-real, allocatable :: temp(:,:,:), tissue(:,:,:), tissueGLOBAL(:,:,:), Q(:,:,:)
+real, allocatable :: temp(:,:,:), tissue(:,:,:), tissueGLOBAL(:,:,:)
 
 ! mpi variables
 type(mpi_comm)   :: comm, new_comm
@@ -47,7 +47,7 @@ call zarray
 
 N = nzg ! points for heat sim
 allocate(tissue(nxg, nyg, nzg), tissueGLOBAL(nxg,nyg,nzg))!, q(nxg,nyg,nzg))
-allocate(temp(0:N+1, 0:N+1, 0:N+1), Q(nxg, nyg, nzg))
+allocate(temp(0:N+1, 0:N+1, 0:N+1))
 
 
 time            = 0.
@@ -114,18 +114,17 @@ call cpu_time(start)
 !loop over photons 
 print*,'Photons now running on core: ',id
 
-Q = 0.
-temp = 37 + 273.
-temp(N+1,:,:) = 37.+273.  ! side face
-temp(0,:,:) = 37.+273.    ! side face
-temp(:,0,:) = 37.+273. ! front face
-temp(:,N+1,:) = 37.+273.  ! back face
-temp(:,:,0) = 37.+273.  ! bottom face
+temp = 5 + 273.
+temp(N+1,:,:) = 5.+273.  ! side face
+temp(0,:,:) = 5.+273.    ! side face
+temp(:,0,:) = 5.+273. ! front face
+temp(:,N+1,:) = 5.+273.  ! back face
+temp(:,:,0) = 5.+273.  ! bottom face
 temp(:,:,N+1) = 25.+273.  ! top face 
 
-call initThermalCoeff(delt, N)
+call initThermalCoeff(delt, N, id)
 
-print*,energyPerPixel
+print*,energyPerPixel,pulselength*60.,60./49.
 
 do while(time <= total_time)
    if(laser_flag)then
@@ -164,17 +163,17 @@ do while(time <= total_time)
       end do      ! end loop over nph photons
       call MPI_REDUCE(jmean, jmeanGLOBAL, (nxg*nyg*nzg),MPI_DOUBLE_PRECISION, MPI_SUM,0,new_comm)
 
-      jmeanGLOBAL = jmeanGLOBAL * ((60./49.)/(nphotons*numproc*(2.*xmax*1d-2/nxg)*(2.*ymax*1d-2/nyg)*(2.*zmax*1d-2/nzg)))
+      jmeanGLOBAL = jmeanGLOBAL * ((60.*pulselength)/(nphotons*numproc*(2.*xmax*1d-2/nxg)*(2.*ymax*1d-2/nyg)*(2.*zmax*1d-2/nzg)))
    end if
 
-   call heat_sim_3d(jmeanGLOBAL, temp, tissue, Q, N, id, numproc, new_comm, right, left, counter)
+   call heat_sim_3d(jmeanGLOBAL, temp, tissue, N, id, numproc, new_comm, right, left, counter)
 
    tissueGLOBAL = 0.
 
    ! call MPI_allREDUCE(tissue, tissueGLOBAL, (nxg*nyg*nzg),MPI_DOUBLE_PRECISION, MPI_SUM,new_comm)
 
    !500,450,330
-   where(temp >= 330.d0 + 273.d0)
+   where(temp >= 550.d0 + 273.d0)
       rhokap = 0.
    end where
 
@@ -182,17 +181,22 @@ do while(time <= total_time)
    jmean = 0.
 end do
    if(id == 0)then
-      open(newunit=u,file=trim(fileplace)//"deposit/rhokap-final-330-"//str(energyPerPixel,6)//".dat" &
+      open(newunit=u,file=trim(fileplace)//"deposit/rhokap-tester-"//str(energyPerPixel,6)//".dat" &
           ,access="stream",form="unformatted", status="replace")
       write(u)rhokap
       close(u)
 
-      open(newunit=u,file=trim(fileplace)//"deposit/temp-final-330-"//str(energyPerPixel,6)//".dat" &
+      open(newunit=u,file=trim(fileplace)//"deposit/abfront-tester-"//str(energyPerPixel,6)//".dat" &
+          ,access="stream",form="unformatted", status="replace")
+      write(u)abfront
+      close(u)
+
+      open(newunit=u,file=trim(fileplace)//"deposit/temp-tester-"//str(energyPerPixel,6)//".dat" &
           ,access="stream",form="unformatted", status="replace")
       write(u)temp(1:N,1:n,1:n) - 273.
       close(u)
 
-      open(newunit=u,file=trim(fileplace)//"deposit/tissue-final-330-"//str(energyPerPixel,6)//".dat" &
+      open(newunit=u,file=trim(fileplace)//"deposit/tissue-tester-"//str(energyPerPixel,6)//".dat" &
           ,access="stream",form="unformatted", status="replace")
       write(u)tissue
       close(u)

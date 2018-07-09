@@ -5,43 +5,43 @@ Module Heat
     real              :: pulseCount, repetitionCount, time, laserOn, total_time, repetitionRate_1, energyPerPixel
     real              :: Power=60.d0, pulselength, delt
     real              :: dx, dy, dz, eta, massVoxel
-    real, allocatable :: coeff(:,:,:), alpha(:,:,:)
-    integer, allocatable :: air(:,:,:)
+    real, allocatable :: coeff(:,:,:), alpha(:,:,:), kappa(:,:,:), WaterContent(:,:,:), Q(:,:,:)
+    real, allocatable :: abFront(:,:,:)!, abFrontGlobal(:,:,:)
     logical           :: laser_flag
     integer           :: loops
 
     private
     public :: heat_sim_3D, pulseCount, repetitionCount, laserOn, laser_flag, time, initThermalCoeff, repetitionRate_1
-    public :: coeff, dx, dy, dz, eta, loops, total_time, energyPerPixel, pulselength,Power, alpha
-    public :: delt, air, massVoxel
+    public :: coeff, dx, dy, dz, eta, loops, total_time, energyPerPixel, pulselength,Power, alpha, kappa, abFront
+    public :: delt, massVoxel, WaterContent, Q
 
     contains
 
-subroutine heat_sim_3D(jmean, temp, tissue, Q, numpoints, id, numproc, new_comm, right, left, counter)
+subroutine heat_sim_3D(jmean, temp, tissue, numpoints, id, numproc, new_comm, right, left, counter)
 
         use mpi_f08
         use utils,     only : str
         use constants, only : fileplace
-        use thermalConstants, only : tempAir4, skinBeta, skinAlpha, skinDensity, skinThermalCond, h, tempAir, QVapor, skinheatCap
+        use thermalConstants, only : skinBeta, skinAlpha, skinDensity, h, tempAir, QVapor, skinheatCap
 
         implicit none
         
         real,           intent(IN)    :: jmean(:,:,:)
         integer,        intent(IN)    :: numpoints, right, left, id, numproc,counter
         type(mpi_comm), intent(IN)    :: new_comm
-        real,           intent(INOUT) :: temp(0:numpoints+1,0:numpoints+1,0:numpoints+1), tissue(:,:,:), Q(:,:,:)
+        real,           intent(INOUT) :: temp(0:numpoints+1,0:numpoints+1,0:numpoints+1), tissue(:,:,:)
 
         type(MPI_Status) :: recv_status
 
         !heat variables
         real              :: u_xx, u_yy, u_zz, delt
-        real              :: tim_srt, Q_vapor, L_w
+        real              :: tim_srt
         real, allocatable :: T0(:,:,:), jtmp(:,:,:), Ttmp(:,:,:), qtmp(:,:,:)
-        integer           :: i, j, k, p, u, size_x, size_y, size_z, xi, yi, zi, xf, yf, zf, lo, N, o, tag,zsta,zfin
+        integer           :: i, j, k, p, size_x, size_y, size_z, xi, yi, zi, xf, yf, zf, lo, N, o, tag,zsta,zfin,u
 
         if(id == 0)then
             !do decomp
-            if(mod(numpoints,numproc) /= 0)then
+            if(mod(numpoints, numproc) /= 0)then
                 print('(I2.1,a,I2.1)'),numpoints,' not divisable by : ', numproc
                 call mpi_finalize()
                 error stop
@@ -67,7 +67,7 @@ subroutine heat_sim_3D(jmean, temp, tissue, Q, numpoints, id, numproc, new_comm,
         zi = 1
         zf = size_z
 
-        call setupThermalCoeff(temp, numpoints, numproc, id)
+        call setupThermalCoeff(temp, numpoints)
 
         !allocate mesh
         allocate(T0(0:numpoints+1, 0:numpoints+1, zi-1:zf+1))
@@ -121,9 +121,14 @@ subroutine heat_sim_3D(jmean, temp, tissue, Q, numpoints, id, numproc, new_comm,
             do k = zi, zf
                 do j = yi, yf
                     do i = xi, xf
-                        if(k == zf .and. id == numproc-1)then!B.Cs
-                        u_zz = (alpha(i,j,k) / dx**2) * ((2.*dx / skinThermalCond) * (-h*dx*dy*(t0(i,j,k) - tempAir) - &
-                                eta*(t0(i,j,k)**4 - tempAir4)) - 2. * t0(i, j, k) + 2.*t0(i, j, k + 1))
+                        ! if(abfront(i,j,k) == 1)then
+                        if((k == zf .and. id == numproc-1) .or. (k == zi .and. id == 0))then!B.Cs
+                        u_zz = (2. / dx**2) * ((dx * h * alpha(i, j, k)) / kappa(i, j, k) * (tempAir - t0(i, j, k)) &
+                                + alpha(i, j, k+1) * t0(i, j, k + 1) - alpha(i,j,k-1) * t0(i, j, k - 1))
+
+
+                                !(alpha(i,j,k) / dx**2) * ((2.*dx / skinThermalCond) * (-h*dx*dy*(t0(i,j,k) - tempAir) - &
+                                !eta*(t0(i,j,k)**4 - tempAir4)) - 2. * t0(i, j, k) + 2.*t0(i, j, k + 1))
                         else
                         u_zz = (1.d0 / dz**2) * (alpha(i,j,k-1) * t0(i, j,     k - 1) - 2. * alpha(i,j,k) * t0(i, j, k) + &
                                 alpha(i,j,k+1) * t0(i, j, k + 1))
@@ -190,6 +195,10 @@ subroutine heat_sim_3D(jmean, temp, tissue, Q, numpoints, id, numproc, new_comm,
             ! write(u)temp(1:numpoints,1:numpoints,1:numpoints) - 273.
             ! close(u)
 
+            ! open(newunit=u,file=trim(fileplace)//"deposit/abfront-"//str(counter)//".dat" &
+            !   ,access="stream",form="unformatted", status="replace")
+            ! write(u)abFront
+            ! close(u)
             ! open(newunit=u,file=trim(fileplace)//'deposit/tissue-'//str(counter)//"-"//str(time,5)//'.dat',access='stream', &
             !      form='unformatted',status='replace')
             ! write(u)100.*(1.-exp(-tissue))
@@ -199,15 +208,16 @@ subroutine heat_sim_3D(jmean, temp, tissue, Q, numpoints, id, numproc, new_comm,
    end subroutine heat_sim_3D
 
 
-    subroutine initThermalCoeff(delt, numpoints)
+    subroutine initThermalCoeff(delt, numpoints,id)
 
         use thermalConstants
-        use constants, only : nxg, nyg, nzg
+        use constants, only : nxg, nyg, nzg, fileplace
 
         implicit none
 
         real,    intent(INOUT) :: delt
         integer, intent(IN)    :: numpoints
+        integer :: id, u
 
         dx = 2.d0 * .55d-2 / (numpoints + 2)
         dy = 2.d0 * .55d-2 / (numpoints + 2)
@@ -217,9 +227,19 @@ subroutine heat_sim_3D(jmean, temp, tissue, Q, numpoints, id, numproc, new_comm,
 
         eta = eps*S_B_Constant*dx*dy !$\varepsilon \sigma A$
 
-        allocate(coeff(0:nxg+1, 0:nyg+1, 0:nzg+1))
-        allocate(alpha(0:nxg+1, 0:nyg+1, 0:nzg+1))
-        allocate(air(nxg,nyg,nzg))
+        allocate(abFront(0:nxg+1, 0:nyg+1, 0:nzg+1),stat=u)
+        allocate(  coeff(0:nxg+1, 0:nyg+1, 0:nzg+1))
+        allocate(  alpha(0:nxg+1, 0:nyg+1, 0:nzg+1))
+        allocate(  kappa(0:nxg+1, 0:nyg+1, 0:nzg+1))
+
+        allocate(Q(nxg, nyg, nzg))
+        allocate(watercontent(nxg, nyg, nzg))
+
+        Q = 0.d0
+        WaterContent = watercontentInit
+
+        abFront = 0.
+        abFront(:,:,nzg) = 1.
 
         alpha = skinAlpha
         alpha(:,:,nzg+1) = airThermalCond(25.+273) / (airDensity(25.+273.) * airHeatCap) 
@@ -230,7 +250,10 @@ subroutine heat_sim_3D(jmean, temp, tissue, Q, numpoints, id, numproc, new_comm,
         coeff = 0.
         coeff(1:nxg,1:nyg,1:nzg) = skinAlpha * delt/skinThermalCond
 
-        pulseLength = (energyPerPixel * 1d-3 * 81.d0) / Power
+        kappa = airThermalCond(25.+273.)
+        kappa(1:nxg,1:nyg,1:nzg) = skinThermalCond
+
+        pulseLength = (energyPerPixel * 1d-3 * 49.d0) / Power
 
         massVoxel = skinDensity*(2.*0.55d-2/nxg)**3
         QVapor = lw * massVoxel
@@ -238,7 +261,7 @@ subroutine heat_sim_3D(jmean, temp, tissue, Q, numpoints, id, numproc, new_comm,
     end subroutine initThermalCoeff
 
 
-    subroutine setupThermalCoeff(temp, numpoints, numproc, id)
+    subroutine setupThermalCoeff(temp, numpoints)
 
         use constants, only : nxg, nyg, nzg
         use iarray, only : rhokap
@@ -246,21 +269,28 @@ subroutine heat_sim_3D(jmean, temp, tissue, Q, numpoints, id, numproc, new_comm,
 
         implicit none
 
-        integer, intent(IN) :: id, numpoints, numproc
+        integer, intent(IN) :: numpoints
         real,    intent(IN) :: temp(0:numpoints+1, 0:numpoints+1, 0:numpoints+1)
 
         integer :: i, j, k
-        real    :: alphaAir, delt, kappa
+        real :: water, density
 
         do k = 1, nzg
             do j = 1, nyg
                 do i = 1, nxg
                     if(rhokap(i,j,k) <= 1.)then
-                        air(i,j,k) = 0
-                        kappa = airThermalCond(temp(i,j,k))
+                        abfront(i,j,k) = 0
+                        if(rhokap(i,j,k-1) > 1.)abFront(i,j,k-1)=1
+                        kappa(i,j,k) = airThermalCond(temp(i,j,k))
                         ! alpha = kappa / (rho * c_heat)
-                        alphaAir = kappa / (airDensity(temp(i,j,k)) * airHeatCap)
-                        coeff(i,j,k) = alphaAir*delt/ kappa 
+                        alpha(i,j,k) = kappa(i,j,k) / (airDensity(temp(i,j,k)) * airHeatCap)
+                        coeff(i,j,k) = alpha(i,j,k)*delt/ kappa(i,j,k)
+                    else
+                        water = getWaterContent(WaterContent(i,j,k), Q(i,j,k))
+                        density = getSkinDensity(water)
+                        kappa(i,j,k) = getSkinThermalCond(water, density)
+                        alpha(i,j,k) = kappa(i,j,k) / (density * getSkinHeatCap(water))
+                        coeff(i,j,k) = alpha(i,j,k) * delt / kappa(i,j,k)
                     end if
                 end do
             end do

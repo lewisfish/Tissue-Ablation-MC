@@ -33,6 +33,7 @@ CONTAINS
    end do
    call init_opt4
    !**************  Loop through x, y, and z to set up grid density and refractive index grid.  ****
+   rhokap = 0.
    do i=1,nxg
       do j=1,nyg
          do k=1,nzg

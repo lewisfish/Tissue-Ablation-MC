@@ -209,43 +209,38 @@ CONTAINS
    end subroutine update_voxels
 
 
-   integer function find(val, a)
-   !searchs for bracketing indicies for a value val in an array a
-   !
-   !
-      implicit none
-      
-      real, intent(IN) :: val, a(:)
-      integer          :: n, lo, mid, hi
-      logical          :: ascnd
+    integer function find(val, a)
+    !searchs for bracketing indicies for a value val in an array a
+    !
+    !
+        implicit none
 
-      n = size(a)
-      ascnd = (a(n) >= a(1))
-      lo = 0
-      hi = n+1
-      do
-         if (hi-lo <= 1) exit
-         mid = (hi+lo)/2
-         if (ascnd .eqv. (val >= a(mid))) then
-            lo = mid
-         else
-            hi = mid
-         end if
-      end do
+        real, intent(IN) :: val, a(:)
+        integer          :: n, lo, mid, hi
 
-      if (val == a(1)) then
-         find = 1
-      else if (val == a(n)) then
-         find = n-1
-      else if(ascnd.and. (val > a(n) .or. val < a(1))) then
-         find = -1
-      else if(.not.ascnd.and. (val < a(n) .or. val > a(1))) then
-         find = -1
-      else
-         find = lo
-      end if
+        n = size(a)
+        lo = 0
+        hi = n + 1
 
-   end function find
+        if (val == a(1)) then
+            find = 1
+        else if (val == a(n)) then
+            find = n-1
+        else if((val > a(n)) .or. (val < a(1))) then
+            find = -1
+        else
+            do
+                if (hi-lo <= 1) exit
+                mid = (hi+lo)/2
+                if (val >= a(mid)) then
+                    lo = mid
+                else
+                    hi = mid
+                end if
+            end do
+            find = lo
+        end if
+    end function find
 
 
    subroutine repeat_bounds(cella, cellb, acur, bcur, amax, bmax, nag, nbg, delta) 
