@@ -122,7 +122,7 @@ subroutine heat_sim_3D(jmean, temp, tissue, numpoints, id, numproc, new_comm, ri
                 do j = yi, yf
                     do i = xi, xf
                         ! if(abfront(i,j,k) == 1)then
-                        if((k == zf .and. id == numproc-1) .or. (k == zi .and. id == 0))then!B.Cs
+                        if((k == zf .and. id == numproc-1))then!B.Cs
                         u_zz = (2. / dx**2) * ((dx * h * alpha(i, j, k)) / kappa(i, j, k) * (tempAir - t0(i, j, k)) &
                                 + alpha(i, j, k+1) * t0(i, j, k + 1) - alpha(i,j,k-1) * t0(i, j, k - 1))
 
@@ -141,9 +141,9 @@ subroutine heat_sim_3D(jmean, temp, tissue, numpoints, id, numproc, new_comm, ri
                                 alpha(i,j+1,k) * t0(i, j + 1, k))
 
                         if(t0(i,j,k) >= 100. + 273. .and. Qtmp(i,j,k) < QVapor)then
-                            Qtmp(i,j,k) = Qtmp(i,j,k) + &
-                            laserOn*jtmp(i,j,k)*delt*skinDensity * massVoxel + &
-                            (skinheatCap * massVoxel * (delt * (u_xx + u_yy + u_zz)))
+                            Qtmp(i,j,k) = min(Qtmp(i,j,k) + &
+                            laserOn*jtmp(i,j,k)*delt*skinDensity * massVoxel, QVapor) !+ &
+                            ! (skinheatCap * massVoxel * (delt * (u_xx + u_yy + u_zz)))
                             t0(i,j,k) = 100. + 273.
                         else
                             t0(i,j,k) = delt * (u_xx + u_yy + u_zz) + t0(i,j,k) + laserOn*coeff(i,j,k)*jtmp(i,j,k)
@@ -190,15 +190,16 @@ subroutine heat_sim_3D(jmean, temp, tissue, numpoints, id, numproc, new_comm, ri
 
         !send data to master process and do I/O
         ! if(id == 0)then
-            ! open(newunit=u,file=trim(fileplace)//'deposit/t/temp-'//str(counter)//"-"//str(time,5)//'.dat',access='stream', &
-            !      form='unformatted',status='replace')
-            ! write(u)temp(1:numpoints,1:numpoints,1:numpoints) - 273.
-            ! close(u)
+        !     open(newunit=u,file=trim(fileplace)//'deposit/t/water-'//str(counter)//"-"//str(time,5)//'.dat',access='stream', &
+        !          form='unformatted',status='replace')
+        !     write(u)WaterContent
+        !     close(u)
 
-            ! open(newunit=u,file=trim(fileplace)//"deposit/abfront-"//str(counter)//".dat" &
-            !   ,access="stream",form="unformatted", status="replace")
-            ! write(u)abFront
-            ! close(u)
+        !     open(newunit=u,file=trim(fileplace)//"deposit/t/Q-"//str(counter)//".dat" &
+        !       ,access="stream",form="unformatted", status="replace")
+        !     write(u)Q
+        !     close(u)
+
             ! open(newunit=u,file=trim(fileplace)//'deposit/tissue-'//str(counter)//"-"//str(time,5)//'.dat',access='stream', &
             !      form='unformatted',status='replace')
             ! write(u)100.*(1.-exp(-tissue))
@@ -211,12 +212,14 @@ subroutine heat_sim_3D(jmean, temp, tissue, numpoints, id, numproc, new_comm, ri
     subroutine initThermalCoeff(delt, numpoints,id)
 
         use thermalConstants
-        use constants, only : nxg, nyg, nzg, fileplace
+        use constants, only : nxg, nyg, nzg
 
         implicit none
 
         real,    intent(INOUT) :: delt
         integer, intent(IN)    :: numpoints
+
+        real    :: density, alphatmp, kappatmp
         integer :: id, u
 
         dx = 2.d0 * .55d-2 / (numpoints + 2)
@@ -241,17 +244,25 @@ subroutine heat_sim_3D(jmean, temp, tissue, numpoints, id, numproc, new_comm, ri
         abFront = 0.
         abFront(:,:,nzg) = 1.
 
-        alpha = skinAlpha
+        density = getSkinDensity(watercontentInit)
+        kappatmp = getSkinThermalCond(watercontentInit, density)
+        alphatmp = kappatmp / (density * getSkinHeatCap(watercontentInit))
+        
+        alpha = alphatmp
         alpha(:,:,nzg+1) = airThermalCond(25.+273) / (airDensity(25.+273.) * airHeatCap) 
+
+        kappa = airThermalCond(25.+273.)
+        kappa(1:nxg,1:nyg,1:nzg) = getSkinThermalCond(watercontentInit, density)
+
+        ! kappa(1:nxg,1:nyg,1:nzg) = skinThermalCond
 
         delt = dx**2/(6.*skinAlpha*skinBeta)
         delt = delt / 100.
 
         coeff = 0.
-        coeff(1:nxg,1:nyg,1:nzg) = skinAlpha * delt/skinThermalCond
+        coeff(1:nxg,1:nyg,1:nzg) = alphatmp * delt / kappatmp
+        ! coeff(1:nxg,1:nyg,1:nzg) = skinAlpha * delt/skinThermalCond
 
-        kappa = airThermalCond(25.+273.)
-        kappa(1:nxg,1:nyg,1:nzg) = skinThermalCond
 
         pulseLength = (energyPerPixel * 1d-3 * 49.d0) / Power
 
@@ -273,24 +284,26 @@ subroutine heat_sim_3D(jmean, temp, tissue, numpoints, id, numproc, new_comm, ri
         real,    intent(IN) :: temp(0:numpoints+1, 0:numpoints+1, 0:numpoints+1)
 
         integer :: i, j, k
-        real :: water, density
+        real :: density
+
+        WaterContent = getWaterContent(Q)
 
         do k = 1, nzg
             do j = 1, nyg
                 do i = 1, nxg
-                    if(rhokap(i,j,k) <= 1.)then
+                    if(rhokap(i,j,k) > 1.)then
+                        density = getSkinDensity(WaterContent(i,j,k))
+
+                        kappa(i,j,k) = getSkinThermalCond(WaterContent(i,j,k), density)
+                        alpha(i,j,k) = kappa(i,j,k) / (density * getSkinHeatCap(WaterContent(i,j,k)))
+                        coeff(i,j,k) = alpha(i,j,k) * delt / kappa(i,j,k)
+                    elseif(rhokap(i,j,k) <= 1.)then
                         abfront(i,j,k) = 0
                         if(rhokap(i,j,k-1) > 1.)abFront(i,j,k-1)=1
                         kappa(i,j,k) = airThermalCond(temp(i,j,k))
                         ! alpha = kappa / (rho * c_heat)
                         alpha(i,j,k) = kappa(i,j,k) / (airDensity(temp(i,j,k)) * airHeatCap)
                         coeff(i,j,k) = alpha(i,j,k)*delt/ kappa(i,j,k)
-                    else
-                        water = getWaterContent(WaterContent(i,j,k), Q(i,j,k))
-                        density = getSkinDensity(water)
-                        kappa(i,j,k) = getSkinThermalCond(water, density)
-                        alpha(i,j,k) = kappa(i,j,k) / (density * getSkinHeatCap(water))
-                        coeff(i,j,k) = alpha(i,j,k) * delt / kappa(i,j,k)
                     end if
                 end do
             end do

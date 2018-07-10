@@ -52,13 +52,13 @@ module thermalConstants
         end function airDensity
 
 
-        real function getWaterContent(current, Qcurrent)
+        elemental real function getWaterContent(Qcurrent)
 
             implicit none
 
-            real, intent(IN) :: current, Qcurrent
+            real, intent(IN) :: Qcurrent
 
-            getWaterContent = current - waterContentInit * (Qcurrent / QVapor)
+            getWaterContent = waterContentInit - waterContentInit * (Qcurrent / QVapor)
 
         end function getWaterContent
 
@@ -83,7 +83,7 @@ module thermalConstants
 
             real, intent(IN) :: waterContent
 
-            getSkinHeatCap = 2.5d-3 * waterContent + 1.7d-3
+            getSkinHeatCap = 2.5d3 * waterContent + 1.7d3
 
         end function getSkinHeatCap
 

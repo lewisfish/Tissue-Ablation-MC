@@ -119,7 +119,7 @@ temp(N+1,:,:) = 5.+273.  ! side face
 temp(0,:,:) = 5.+273.    ! side face
 temp(:,0,:) = 5.+273. ! front face
 temp(:,N+1,:) = 5.+273.  ! back face
-temp(:,:,0) = 5.+273.  ! bottom face
+temp(:,:,0) = 25.+273.  ! bottom face
 temp(:,:,N+1) = 25.+273.  ! top face 
 
 call initThermalCoeff(delt, N, id)
@@ -173,7 +173,7 @@ do while(time <= total_time)
    ! call MPI_allREDUCE(tissue, tissueGLOBAL, (nxg*nyg*nzg),MPI_DOUBLE_PRECISION, MPI_SUM,new_comm)
 
    !500,450,330
-   where(temp >= 550.d0 + 273.d0)
+   where(temp >= 330.d0 + 273.d0)
       rhokap = 0.
    end where
 
@@ -181,22 +181,22 @@ do while(time <= total_time)
    jmean = 0.
 end do
    if(id == 0)then
-      open(newunit=u,file=trim(fileplace)//"deposit/rhokap-tester-"//str(energyPerPixel,6)//".dat" &
+      open(newunit=u,file=trim(fileplace)//"deposit/rhokap-tester-330-"//str(energyPerPixel,6)//".dat" &
           ,access="stream",form="unformatted", status="replace")
-      write(u)rhokap
+      write(u)rhokap(1:nxg, 1:nyg, 1:nzg)
       close(u)
 
-      open(newunit=u,file=trim(fileplace)//"deposit/abfront-tester-"//str(energyPerPixel,6)//".dat" &
+      open(newunit=u,file=trim(fileplace)//"deposit/abfront-tester-330-"//str(energyPerPixel,6)//".dat" &
           ,access="stream",form="unformatted", status="replace")
       write(u)abfront
       close(u)
 
-      open(newunit=u,file=trim(fileplace)//"deposit/temp-tester-"//str(energyPerPixel,6)//".dat" &
+      open(newunit=u,file=trim(fileplace)//"deposit/temp-tester-330-"//str(energyPerPixel,6)//".dat" &
           ,access="stream",form="unformatted", status="replace")
       write(u)temp(1:N,1:n,1:n) - 273.
       close(u)
 
-      open(newunit=u,file=trim(fileplace)//"deposit/tissue-tester-"//str(energyPerPixel,6)//".dat" &
+      open(newunit=u,file=trim(fileplace)//"deposit/tissue-tester-330-"//str(energyPerPixel,6)//".dat" &
           ,access="stream",form="unformatted", status="replace")
       write(u)tissue
       close(u)
