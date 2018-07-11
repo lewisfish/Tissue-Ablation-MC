@@ -6,7 +6,7 @@ CONTAINS
    
    subroutine init_opt1
 !
-!  subroutine to set tissue optical properties 808nm
+!  subroutine to set tissue optical properties 10.6um
 !
    use opt_prop
    

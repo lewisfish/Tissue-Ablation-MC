@@ -247,7 +247,7 @@ subroutine heat_sim_3D(jmean, temp, tissue, numpoints, id, numproc, new_comm, ri
         density = getSkinDensity(watercontentInit)
         kappatmp = getSkinThermalCond(watercontentInit, density)
         alphatmp = kappatmp / (density * getSkinHeatCap(watercontentInit))
-        
+
         alpha = alphatmp
         alpha(:,:,nzg+1) = airThermalCond(25.+273) / (airDensity(25.+273.) * airHeatCap) 
 
@@ -293,6 +293,7 @@ subroutine heat_sim_3D(jmean, temp, tissue, numpoints, id, numproc, new_comm, ri
                 do i = 1, nxg
                     if(rhokap(i,j,k) > 1.)then
                         density = getSkinDensity(WaterContent(i,j,k))
+                        rhokap(i,j,k) = (watercontent(i,j,k) * 865.13) + 100.
 
                         kappa(i,j,k) = getSkinThermalCond(WaterContent(i,j,k), density)
                         alpha(i,j,k) = kappa(i,j,k) / (density * getSkinHeatCap(WaterContent(i,j,k)))
