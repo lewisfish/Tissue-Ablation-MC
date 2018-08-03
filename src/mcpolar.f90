@@ -173,30 +173,31 @@ do while(time <= total_time)
    ! call MPI_allREDUCE(tissue, tissueGLOBAL, (nxg*nyg*nzg),MPI_DOUBLE_PRECISION, MPI_SUM,new_comm)
 
    !500,450,330
-   where(temp >= 250.d0 + 273.d0)
-      rhokap = 0.
+   where(temp >= 173.d0 + 273.d0)
+      rhokap = 0.d0
+      temp = 25.d0 + 273.d0
    end where
 
    counter = counter + 1
    jmean = 0.
 end do
    if(id == 0)then
-      open(newunit=u,file=trim(fileplace)//"deposit/rhokap-tester2-250-"//str(energyPerPixel,6)//".dat" &
+open(newunit=u,file=trim(fileplace)//"deposit/rhokap-timestep-pulsediv100-"//str(nzg)//"-173-"//str(energyPerPixel,6)//".dat" &
           ,access="stream",form="unformatted", status="replace")
       write(u)rhokap(1:nxg, 1:nyg, 1:nzg)
       close(u)
 
-      open(newunit=u,file=trim(fileplace)//"deposit/abfront-tester2-250-"//str(energyPerPixel,6)//".dat" &
-          ,access="stream",form="unformatted", status="replace")
-      write(u)abfront
-      close(u)
+      ! open(newunit=u,file=trim(fileplace)//"deposit/abfront-"//str(nzg)//"-173-"//str(energyPerPixel,6)//".dat" &
+      !     ,access="stream",form="unformatted", status="replace")
+      ! write(u)abfront
+      ! close(u)
 
-      open(newunit=u,file=trim(fileplace)//"deposit/temp-tester2-250-"//str(energyPerPixel,6)//".dat" &
+open(newunit=u,file=trim(fileplace)//"deposit/temp-timestep-pulsediv100-"//str(nzg)//"-173-"//str(energyPerPixel,6)//".dat" &
           ,access="stream",form="unformatted", status="replace")
       write(u)temp(1:N,1:n,1:n) - 273.
       close(u)
 
-      open(newunit=u,file=trim(fileplace)//"deposit/tissue-tester2-250-"//str(energyPerPixel,6)//".dat" &
+open(newunit=u,file=trim(fileplace)//"deposit/tissue-timestep-pulsediv100-"//str(nzg)//"-173-"//str(energyPerPixel,6)//".dat" &
           ,access="stream",form="unformatted", status="replace")
       write(u)tissue
       close(u)

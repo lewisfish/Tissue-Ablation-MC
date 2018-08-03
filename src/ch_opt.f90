@@ -15,7 +15,7 @@ CONTAINS
    hgg = 0.9
    g2  = hgg**2.
    mua = 865.13   ! taken from water absop data
-   mus = 100.!. / (1. - hgg)
+   mus = 0.!. / (1. - hgg)
 
    kappa  = mus + mua
    albedo = mus / kappa

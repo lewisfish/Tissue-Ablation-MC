@@ -89,10 +89,10 @@ subroutine heat_sim_3D(jmean, temp, tissue, numpoints, id, numproc, new_comm, ri
             call mpi_recv(t0, size(t0), mpi_double_precision, 0, tag, new_comm, recv_status)
         end if
 
-        delt = dx**2/(6.*skinAlpha*skinBeta)
-        delt = delt / 100.
-
-
+        ! delt = dx**2/(6.*skinAlpha*skinBeta)
+        delt = pulseLength/100. !delt / 100.
+        ! print*,pulselength,delt,pulselength/100.
+        ! stop
         jtmp = 0.
         call mpi_scatter(jmean, size(jmean(:,:,zi:zf)), mpi_double_precision, jtmp(:,:,zi:zf), size(jtmp(:,:,zi:zf)), &
                          mpi_double_precision, 0, new_comm)
@@ -112,7 +112,7 @@ subroutine heat_sim_3D(jmean, temp, tissue, numpoints, id, numproc, new_comm, ri
         if(id == 0)print"(a,L1)","Laser On: ",laser_flag
         o = int(1./delt)
         lo = o / 100
-        if(id == 0)print"(a,F9.5,1x,a,I4)","Elapsed Time: ",time, "Loops left: ",int(total_time/(100.*delt)) - counter
+        if(id == 0)print"(a,F9.5,1x,a,I4)","Elapsed Time: ",time, "Loops left: ",int(total_time/(real(loops)*delt)) - counter
         call cpu_time(tim_srt)
         do p = 1, loops
             
@@ -176,7 +176,7 @@ subroutine heat_sim_3D(jmean, temp, tissue, numpoints, id, numproc, new_comm, ri
             pulseCount = pulseCount + delt
             repetitionCount = repetitionCount + delt
             time = time + delt
-            call Arrhenius(t0, time, Ttmp, zi, zf, numpoints)
+            ! call Arrhenius(t0, time, Ttmp, zi, zf, numpoints)
         end do
 
         call mpi_allgather(t0(:,:,zi:zf), size(t0(:,:,zi:zf)), mpi_double_precision, &
@@ -293,14 +293,14 @@ subroutine heat_sim_3D(jmean, temp, tissue, numpoints, id, numproc, new_comm, ri
                 do i = 1, nxg
                     if(rhokap(i,j,k) > 1.)then
                         density = getSkinDensity(WaterContent(i,j,k))
-                        rhokap(i,j,k) = (watercontent(i,j,k) * 865.13) + 100.
+                        rhokap(i,j,k) = (watercontent(i,j,k) * 865.13)
 
                         kappa(i,j,k) = getSkinThermalCond(WaterContent(i,j,k), density)
                         alpha(i,j,k) = kappa(i,j,k) / (density * getSkinHeatCap(WaterContent(i,j,k)))
                         coeff(i,j,k) = alpha(i,j,k) * delt / kappa(i,j,k)
                     elseif(rhokap(i,j,k) <= 1.)then
-                        abfront(i,j,k) = 0
-                        if(rhokap(i,j,k-1) > 1.)abFront(i,j,k-1)=1
+                        ! abfront(i,j,k) = 0
+                        ! if(rhokap(i,j,k-1) > 1.)abFront(i,j,k-1)=1
                         kappa(i,j,k) = airThermalCond(temp(i,j,k))
                         ! alpha = kappa / (rho * c_heat)
                         alpha(i,j,k) = kappa(i,j,k) / (airDensity(temp(i,j,k)) * airHeatCap)
