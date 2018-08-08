@@ -122,9 +122,9 @@ temp(:,N+1,:) = 5.+273.  ! back face
 temp(:,:,0) = 25.+273.  ! bottom face
 temp(:,:,N+1) = 25.+273.  ! top face 
 
-call initThermalCoeff(delt, N, id)
+call initThermalCoeff(delt, N, id, xmax, ymax, zmax)
 
-print*,energyPerPixel,pulselength*60.,60./49.
+print*,energyPerPixel,delt*loops*60.,delt,loops
 
 do while(time <= total_time)
    if(laser_flag)then
@@ -135,7 +135,7 @@ do while(time <= total_time)
 
          tflag=.FALSE.
 
-         if(mod(j,1000000) == 0)then
+         if(mod(j,5000000) == 0)then
             print *, str(j)//' scattered photons completed on core: '//str(id)
          end if
           
@@ -163,7 +163,9 @@ do while(time <= total_time)
       end do      ! end loop over nph photons
       call MPI_REDUCE(jmean, jmeanGLOBAL, (nxg*nyg*nzg),MPI_DOUBLE_PRECISION, MPI_SUM,0,new_comm)
 
-      jmeanGLOBAL = jmeanGLOBAL * ((60.*pulselength)/(nphotons*numproc*(2.*xmax*1d-2/nxg)*(2.*ymax*1d-2/nyg)*(2.*zmax*1d-2/nzg)))
+      jmeanGLOBAL = jmeanGLOBAL * ((60.)/(nphotons*numproc*(2.*xmax*1d-2/nxg)*(2.*ymax*1d-2/nyg)*(2.*zmax*1d-2/nzg)))
+
+      ! jmeanGLOBAL = jmeanGLOBAL * ((60.*pulselength)/(nphotons*numproc*(2.*xmax*1d-2/nxg)*(2.*ymax*1d-2/nyg)*(2.*zmax*1d-2/nzg)))  ! old, and possibly wrong
    end if
 
    call heat_sim_3d(jmeanGLOBAL, temp, tissue, N, id, numproc, new_comm, right, left, counter)
@@ -173,34 +175,30 @@ do while(time <= total_time)
    ! call MPI_allREDUCE(tissue, tissueGLOBAL, (nxg*nyg*nzg),MPI_DOUBLE_PRECISION, MPI_SUM,new_comm)
 
    !500,450,330
-   where(temp >= 173.d0 + 273.d0)
+   where(temp >= 450.d0 + 273.d0)
       rhokap = 0.d0
-      temp = 25.d0 + 273.d0
    end where
 
    counter = counter + 1
    jmean = 0.
 end do
    if(id == 0)then
-open(newunit=u,file=trim(fileplace)//"deposit/rhokap-timestep-pulsediv100-"//str(nzg)//"-173-"//str(energyPerPixel,6)//".dat" &
+      open(newunit=u,&
+      file=trim(fileplace)//"deposit/time-exp/rhokap-timestep-deltdiv1000-"//str(nzg)//"-450-"//str(energyPerPixel,6)//".dat" &
           ,access="stream",form="unformatted", status="replace")
       write(u)rhokap(1:nxg, 1:nyg, 1:nzg)
       close(u)
 
-      ! open(newunit=u,file=trim(fileplace)//"deposit/abfront-"//str(nzg)//"-173-"//str(energyPerPixel,6)//".dat" &
-      !     ,access="stream",form="unformatted", status="replace")
-      ! write(u)abfront
-      ! close(u)
-
-open(newunit=u,file=trim(fileplace)//"deposit/temp-timestep-pulsediv100-"//str(nzg)//"-173-"//str(energyPerPixel,6)//".dat" &
+      open(newunit=u,&
+      file=trim(fileplace)//"deposit/time-exp/temp-timestep-deltdiv1000-"//str(nzg)//"-450-"//str(energyPerPixel,6)//".dat" &
           ,access="stream",form="unformatted", status="replace")
       write(u)temp(1:N,1:n,1:n) - 273.
       close(u)
 
-open(newunit=u,file=trim(fileplace)//"deposit/tissue-timestep-pulsediv100-"//str(nzg)//"-173-"//str(energyPerPixel,6)//".dat" &
-          ,access="stream",form="unformatted", status="replace")
-      write(u)tissue
-      close(u)
+! open(newunit=u,file=trim(fileplace)//"deposit/tissue-timestep-pulsediv1000-"//str(nzg)//"-173-"//str(energyPerPixel,6)//".dat" &
+!           ,access="stream",form="unformatted", status="replace")
+!       write(u)tissue
+!       close(u)
    end if
 
 call cpu_time(finish)
