@@ -6,7 +6,6 @@ module thermalConstants
     real, parameter :: airHeatCap=1.006d3, tempAir=25.d0+273.d0, tempAir4=tempAir**4
     real, parameter :: S_B_Constant=5.670367d-8, h=10.d0, eps=0.98d0,lw=2256.d3
     real, parameter :: skinAlpha=skinThermalCond/(skinDensity * skinHeatCap)
-    real, parameter :: carbonDensity=25.d0,carbonThermalCond=0.005d0,carbonHeatCap=670.d0!kg/m3, Wm-1k-1, Jkg-1k-1
     real, parameter :: waterContentInit=.80!%
     real            :: skinBeta, QVapor
 
@@ -26,16 +25,20 @@ module thermalConstants
 
     contains
 
-        real function airThermalCond(T)
+        real function airThermalCond(T, i)
         !data taken from engineeringtoolbox.com and fitted in gnuplot
         !temp input in kelvin
             implicit none
 
             real, intent(IN) :: T!in Kelvin
             real, parameter  :: a=-0.188521, b=0.000367259, c=0.212453
+            integer :: i
 
+            if(t < 0.)then
+                print*,i,'loop #'
+                error stop "Negative temp in kelvin"
+            end if
             airThermalCond = a * exp(-b * (T - 273.15d0)) + c
-
         end function airThermalCond
 
 
@@ -58,7 +61,7 @@ module thermalConstants
 
             real, intent(IN) :: Qcurrent
 
-            getWaterContent = waterContentInit - waterContentInit * (Qcurrent / QVapor)
+            getWaterContent = max(min(waterContentInit - waterContentInit * (Qcurrent / QVapor), waterContentInit), 0.0)
 
         end function getWaterContent
 

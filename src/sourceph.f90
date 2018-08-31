@@ -4,9 +4,9 @@ implicit none
 save
 
 CONTAINS
-   subroutine sourceph(xmax,ymax,zmax,xcell,ycell,zcell,iseed)
+   subroutine sourcephCO2(xmax,ymax,zmax,xcell,ycell,zcell,iseed)
 
-   use constants, only : nxg,nyg,nzg,twopi
+   use constants, only : nxg,nyg,nzg,twopi,spotsPerRow, spotsPerCol
    use photon_vars
 
    implicit none
@@ -19,14 +19,12 @@ CONTAINS
 
    real :: spotSize, gridWidth, gridHeight, spotGapCol, spotGapRow, x, y, adjustFactorRow, adjustFactorCol, ranx, rany
    real ::  cenx, ceny, theta, r
-   integer :: spotsPerRow, spotsPerCol, spotsTotal
+   integer :: spotsTotal
 
    gridWidth   = 2. * xmax!cm
    gridHeight   = 2. * ymax!cm
-   spotsPerRow = 9
-   spotsPerCol = 9
    spotsTotal  = spotsPerRow * spotsPerCol
-   spotSize    = 250d-4 !um
+   spotSize    = 150d-4 !um
    spotGapRow  = (gridWidth - (spotsPerRow * spotSize/2.)) / (spotsPerRow)
    spotGapCol  = (gridHeight - (spotsPercol * spotSize/2.)) / (spotsPerCol) 
 
@@ -35,8 +33,8 @@ CONTAINS
    adjustFactorCol = abs((nint(spotsPerCol/2.) * spotGapcol) - ymax)
 
    !get random integer between 1 and spotsPer
-   ranx = int(ran2(iseed) * real(spotsPerRow)) + 1
-   rany = int(ran2(iseed) * real(spotsPerCol)) + 1
+   ranx = 4!int(ran2(iseed) * real(spotsPerRow)) + 1
+   rany = 4!int(ran2(iseed) * real(spotsPerCol)) + 1
 
    !get centre of spot
    x = (ranx * spotGapRow) + (spotSize/2.)   
@@ -52,8 +50,8 @@ CONTAINS
    x = sqrt(r) * cos(theta)
    y = sqrt(r) * sin(theta)
    !get final point
-   xp = x - cenx
-   yp = y - ceny
+   xp = x !- cenx
+   yp = y !- ceny
    zp = zmax-(1.e-8*(2.*zmax/nzg))
 
    phi = twopi * ran2(iseed)
@@ -71,5 +69,70 @@ CONTAINS
    ycell=int(nyg*(yp+ymax)/(2.*ymax))+1
    zcell=int(nzg*(zp+zmax)/(2.*zmax))+1
    !*****************************************************
-   end subroutine sourceph
+   end subroutine sourcephCO2
+
+
+    subroutine sourcephERYAG(xmax, ymax, zmax, xcell, ycell, zcell, iseed)
+
+        use constants, only : nxg, nyg, nzg, twopi, spotsPerRow, spotsPerCol
+        use photon_vars
+
+        implicit none
+
+
+        real,    intent(IN)    :: xmax, ymax, zmax
+        integer, intent(OUT)   :: xcell, ycell, zcell
+        integer, intent(INOUT) :: iseed
+
+        real    :: width, height, ran2, spotSize, spotGapRow, spotGapCol, adjust, xPos, yPos
+        real    :: r, theta, cenx, ceny, x, y
+        integer :: i, j
+
+        width  = 10d-3
+        height = 10d-3
+        iseed = -32489843
+
+        spotSize = 250d-6
+        spotGapRow = width / spotsPerRow
+        spotGapCol = height / spotsPerCol
+        adjust = spotGapRow / 2.
+
+
+        do
+            i = int(ran2(iseed) * real(spotsPerRow)) + 1
+            j = int(ran2(iseed) * real(spotsPerCol)) + 1
+            if((i == 1 .or. i == 5) .and. (j == 1 .or. j == 5))cycle 
+            exit
+        end do 
+        xPos = (i - 1) * spotGapRow + (spotSize/2.)
+        yPos = (j - 1) * spotGapcol + (spotSize/2.)
+        cenx = xPos - xmax + adjust
+        ceny = yPos - ymax + adjust
+
+        r = ran2(iseed) * (spotSize/2.)**2
+        theta = ran2(iseed) * twopi
+        x = sqrt(r) * cos(theta)
+        y = sqrt(r) * sin(theta)
+        xp = x - cenx
+        yp = y - ceny
+        zp = zmax-(1.e-8*(2.*zmax/nzg))
+
+        phi = twopi * ran2(iseed)
+        cosp = cos(phi)
+        sinp = sin(phi)          
+        sint = 0.
+        cost = -1.
+
+        nxp = sint * cosp  
+        nyp = sint * sinp
+        nzp = cost
+
+        !*************** Linear Grid *************************
+        xcell=int(nxg*(xp+xmax)/(2.*xmax))+1
+        ycell=int(nyg*(yp+ymax)/(2.*ymax))+1
+        zcell=int(nzg*(zp+zmax)/(2.*zmax))+1
+        !*****************************************************
+    end subroutine sourcephERYAG
+
+
 end MODULE sourceph_mod

@@ -9,10 +9,7 @@ CONTAINS
    !
    !
       use photon_vars, only : xp, yp, zp
-      use iarray,      only : jmean, rhokap
-      use opt_prop,    only : mua
-
-      
+      use iarray,      only : jmean, rhokap     
    
       implicit none
       
@@ -37,7 +34,6 @@ CONTAINS
       dir = (/.FALSE., .FALSE., .FALSE./)
       
       tau = -log(ran2(iseed))
-
       do
          dir = (/.FALSE., .FALSE., .FALSE./)
          dcell = wall_dist(celli, cellj, cellk, xcur, ycur, zcur, dir)
@@ -46,15 +42,14 @@ CONTAINS
          if(taurun + taucell < tau)then
             taurun = taurun + taucell
             d = d + dcell
-            jmean(celli, cellj, cellk) = jmean(celli, cellj, cellk) + dcell*mua
+            jmean(celli, cellj, cellk) = jmean(celli, cellj, cellk) + dcell*rhokap(celli,cellj,cellk)
 
             call update_pos(xcur, ycur, zcur, celli, cellj, cellk, dcell, .TRUE., dir, delta)
-         
          else
 
             dcell = (tau - taurun) / rhokap(celli,cellj,cellk)
             d = d + dcell
-            jmean(celli, cellj, cellk) = jmean(celli, cellj, cellk) + dcell*mua
+            jmean(celli, cellj, cellk) = jmean(celli, cellj, cellk) + dcell*rhokap(celli,cellj,cellk)
             call update_pos(xcur, ycur, zcur, celli, cellj, cellk, dcell, .FALSE., dir, delta)
             exit
          end if

@@ -6,6 +6,6 @@ MODULE iarray
     save
 
     real, allocatable    :: xface(:),yface(:),zface(:)
-    real, allocatable    :: rhokap(:,:,:), absorb(:,:,:)
+    real, allocatable    :: rhokap(:,:,:)
     real, allocatable    :: jmean(:,:,:),jmeanGLOBAL(:,:,:)
 end MODULE iarray

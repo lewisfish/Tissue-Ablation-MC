@@ -1,9 +1,9 @@
 ifeq ($(FCOMP),mpifort)
-FCFLAGS =  -freal-4-real-8 -O2
+FCFLAGS =  -freal-4-real-8 -O2 -march=native -flto
 FCDEBUG = -g -fbacktrace -fcheck=all -fbounds-check -ffpe-trap=invalid,overflow,underflow,denormal
 FCBUILD = -Wall -Wextra -pedantic
 else ifeq ($(FCOMP),mpiifort)
-FCFLAGS = -trace -O3 -r8 -xHOST -ipo -heap-arrays
+FCFLAGS = -O2 -r8 -xHOST -ipo -heap-arrays
 FCDEBUG = -g -debug -traceback -check all -CB -CU -CA -fpe0
 #-traceback -check all -CB -CU -CA -fpe0 -debug
 FCBUILD = -g -debug -traceback -check all -CB -CA -CU -warn all -stand f08
@@ -11,8 +11,8 @@ endif
 
 PROGRAM =  mcgrid 
 
-SRCS =		ran2.f \
-			utils.f90 \
+SRCS =      ran2.f \
+	      utils.f90 \
             constants.f90 \
             photon_vars.f90 \
             thermalConst_mod.f90 \
