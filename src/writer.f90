@@ -1,29 +1,28 @@
-MODULE writer_mod
-
-implicit none
-save
-
-CONTAINS
-   subroutine writer(xmax,ymax,zmax,nphotons, numproc)
-
-   use constants, only : nxg,nyg,nzg,fileplace
-   use iarray,    only : jmeanGLOBAL, rhokap
+module writer_mod
 
    implicit none
 
-   integer :: nphotons, u, numproc
-   real    :: xmax, ymax, zmax   
+   contains
+      subroutine writer(xmax,ymax,zmax,nphotons, numproc)
+      !write out arrays
+         use constants, only : nxg,nyg,nzg,fileplace
+         use iarray,    only : jmeanGLOBAL, rhokap
 
-   !maybe not right
-   jmeanGLOBAL = jmeanGLOBAL * (1./(nphotons*numproc*(2.*xmax/nxg)*(2.*ymax/nyg)*(2.*zmax/nzg)))
+         implicit none
 
-   open(newunit=u,file=trim(fileplace)//'jmean/jmean.dat',access='stream',status='REPLACE',form='unformatted')
-   write(u) jmeanGLOBAL
-   close(u)
+         integer :: nphotons, u, numproc
+         real    :: xmax, ymax, zmax   
+
+         !maybe not right
+         jmeanGLOBAL = jmeanGLOBAL * (1./(nphotons*numproc*(2.*xmax/nxg)*(2.*ymax/nyg)*(2.*zmax/nzg)))
+
+         open(newunit=u,file=trim(fileplace)//'jmean/jmean.dat',access='stream',status='REPLACE',form='unformatted')
+         write(u) jmeanGLOBAL
+         close(u)
 
 
-   open(newunit=u,file=trim(fileplace)//'jmean/rhokap.dat',access='stream',status='REPLACE',form='unformatted')
-   write(u) rhokap
-   close(u)
-   end subroutine writer
-end MODULE writer_mod
+         open(newunit=u,file=trim(fileplace)//'jmean/rhokap.dat',access='stream',status='REPLACE',form='unformatted')
+         write(u) rhokap
+         close(u)
+      end subroutine writer
+end module writer_mod

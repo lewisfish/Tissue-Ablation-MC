@@ -9,18 +9,21 @@ function showhelp
   echo '   -h, --help            Shows this dialog.'
   echo '   -n, --cores           Compiles and run code on n cores. Default is 1 core.'
   echo '   -d, --debug           Compiles and runs code with debug flags on n core.'
-  echo '   -m, --make            Compiles the code with warning enabled.'
-  echo '   -c, --complier        Select complier. gnu or intel.'
+  echo '   -m, --make            Compiles the code with warnings enabled.'
+  echo '   -c, --complier        Select complier. gnu or intel. Default is gnu.'
+  echo '   -p, --progName        Set executable name. Default is mcgrid.'
 
 }
 
 function makebuild
 {
   if [ "$comp" = 'gnu' ];then
-      string="FCOMP=mpifort"
+      string="FCOMP=mpifort PROGRAM="
     elif [ "$comp" = 'intel' ];then
-      string="FCOMP=mpiifort"
+      string="FCOMP=mpiifort PROGRAM="
   fi
+
+  string+="$pname"
 
   if [ "$debug" = 1 ];then
     make clean && make debug $string
@@ -76,18 +79,18 @@ function run
       exit 0
   fi
   echo $(pwd)
-  mv mcgrid "$bdirc" && echo " "&& echo "*****Install complete*****" && echo " "
+  mv $pname "$bdirc" && echo " "&& echo "*****Install complete*****" && echo " "
 
   # clear
   cd ../bin
 
   if [ "$NUM_CORES" = "1" ]; then
-      ./mcgrid
+      ./$pname
   else
     if [ $comp = 'gnu' ];then
-      /usr/local/bin/mpirun -n $NUM_CORES ./mcgrid
+      /usr/local/bin/mpirun -n $NUM_CORES ./$pname
     elif [ $comp = 'intel' ];then
-      mpirun -trace -n $NUM_CORES ./mcgrid
+      mpirun -n $NUM_CORES ./$pname
     fi
   fi
 }
@@ -97,6 +100,7 @@ NUM_CORES=1
 debug=0
 help=0
 comp="gnu"
+pname="mcgrid"
 
 set -e
 
@@ -116,6 +120,8 @@ while [ "$1" != "" ]; do
                                 exit
                                 ;;
         -d | --debug )          debug=1
+                                ;;
+        -p | --progName )       pname=$2
                                 ;;
     esac
     shift

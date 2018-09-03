@@ -1,7 +1,6 @@
-MODULE subs
+module subs
 
 implicit none
-save
 
     contains
         subroutine directory
@@ -26,10 +25,11 @@ save
         end subroutine directory
 
         subroutine zarray
-
+        !   sets all arrays to zero
+        !
+        !
             use iarray
 
-            !sets all arrays to zero
             implicit none
 
             jmean = 0.
@@ -86,9 +86,9 @@ save
 
 
         subroutine chck_mem(cur, new, limit, name, numproc)
-        !routine to check if the system has enough RAM available in order to run the simulation
-        !cur: current memory assigned, new: new memory to be assigned
-        !limit: the limit of RAM available, name: name of array to be assigned, numproc: processor #
+        !   routine to check if the system has enough RAM available in order to run the simulation
+        !   cur: current memory assigned, new: new memory to be assigned
+        !   limit: the limit of RAM available, name: name of array to be assigned, numproc: processor #
 
             use iso_fortran_env, only : int64
             use utils,           only : str
@@ -109,4 +109,4 @@ save
                 stop
             end if
         end subroutine chck_mem
-end MODULE subs
+end module subs

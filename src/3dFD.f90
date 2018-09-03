@@ -24,6 +24,7 @@ subroutine heat_sim_3D(jmean, temp, tissue, numpoints, id, numproc, new_comm, ri
 
         implicit none
         
+        !heat input variables
         real,           intent(IN)    :: jmean(:,:,:)
         integer,        intent(IN)    :: numpoints, right, left, id, numproc,counter
         type(mpi_comm), intent(IN)    :: new_comm
@@ -31,12 +32,14 @@ subroutine heat_sim_3D(jmean, temp, tissue, numpoints, id, numproc, new_comm, ri
 
         type(MPI_Status) :: recv_status
 
-        !heat variables
+        !heat local variables
         real              :: u_xx, u_yy, u_zz, tempIncrease,kappaMinHalf, kappaPlusHalf
-        real :: heatcapMinHalf,densityPlusHalf,densityMinHalf,heatcapPlusHalf,a,b,d
+        real              :: heatcapMinHalf, densityPlusHalf, densityMinHalf, heatcapPlusHalf, a, b, d
         real, allocatable :: T0(:,:,:), jtmp(:,:,:), qtmp(:,:,:)!, Ttmp(:,:,:)
         integer           :: i, j, k, p, size_x, size_y, size_z, xi, yi, zi, xf, yf, zf, N, tag,zsta,zfin
 
+        !calculate size of domain
+        !discretizes along z axis
         if(id == 0)then
             !do decomp
             if(mod(numpoints, numproc) /= 0)then
@@ -47,6 +50,7 @@ subroutine heat_sim_3D(jmean, temp, tissue, numpoints, id, numproc, new_comm, ri
                 N = numpoints / numproc
             end if
         end if
+
         tag = 1
         !send N to all processes
         call MPI_Bcast(N, 1, MPI_integer ,0 , new_comm)
@@ -73,7 +77,7 @@ subroutine heat_sim_3D(jmean, temp, tissue, numpoints, id, numproc, new_comm, ri
         t0 = 0.
         Qtmp = 0.
 
-        !split temp up over all processes
+        !split temp/jmean/Q up over all processes
         if(id == 0)then
             do i = 1, numproc-1
                 zsta = (i)*zf
@@ -97,20 +101,19 @@ subroutine heat_sim_3D(jmean, temp, tissue, numpoints, id, numproc, new_comm, ri
                  mpi_double_precision, 0, new_comm)
 
 
-
-
         if(pulselength < delt)then
             if(id == 0)print*,"pulselength smaller than timestep, adjusting..."
             delt = pulselength / 100.
         end if
+
         loops_left = int(total_time/(real(loops)*delt)) - counter
         if(id == 0 .and. mod(int(total_time/(real(loops)*delt)) - counter, 100) == 0)then
-        print"(a,F9.5,1x,a,I11)","Elapsed Time: ",time, "Loops left: ",loops_left!,&
-            ! laser_flag,pulsesDone
+            print"(a,F9.5,1x,a,I11)","Elapsed Time: ",time, "Loops left: ",loops_left
         end if
 
+        !time loop
         do p = 1, loops
-            
+            !heat sim loops
             do k = zi, zf
                 do j = yi, yf
                     do i = xi, xf
@@ -169,9 +172,7 @@ subroutine heat_sim_3D(jmean, temp, tissue, numpoints, id, numproc, new_comm, ri
                         u_xx = a*t0(i-1,j,k) - 2.d0*b*t0(i,j,k) + d*t0(i+1,j,k)
 
 
-
-
-
+                        ! linear heat equation
                         ! u_xx = (1.d0 / dx**2) * (alpha(i-1,j,k) * t0(i-1,j,k) - 2. *alpha(i,j,k) * t0(i,j,k) + &
                         !         alpha(i+1,j,k) * t0(i+1,j,k))
 
@@ -180,13 +181,14 @@ subroutine heat_sim_3D(jmean, temp, tissue, numpoints, id, numproc, new_comm, ri
 
                         tempIncrease = delt * (u_xx + u_yy + u_zz) 
 
+                        !boil water
                         if(t0(i,j,k) >= 100. + 273. .and. Qtmp(i,j,k) < QVapor)then
                             Qtmp(i,j,k) = min(Qtmp(i,j,k) + &
-                            laserOn*jtmp(i,j,k)*delt*volumeVoxel, Qvapor) !+ &
-                            !getSkinHeatCap(waterContent(i,j,k))*massVoxel*tempIncrease, Qvapor)
+                            laserOn*jtmp(i,j,k)*delt*volumeVoxel, Qvapor)
                             t0(i,j,k) = 100.d0 + 273.d0
                         else
                             t0(i,j,k) =  t0(i,j,k) + tempIncrease + laserOn*coeff(i,j,k)*jtmp(i,j,k)
+                            !check rsult is physical
                             if(t0(i,j,k) < 0.d0)then
                                 print*,id,i,j,k,t0(i,j,k),loops_left
                                 call mpi_abort(new_comm, 1)
@@ -195,6 +197,8 @@ subroutine heat_sim_3D(jmean, temp, tissue, numpoints, id, numproc, new_comm, ri
                     end do
                 end do
             end do
+
+            !halo swap
             !send_recv data to right
             call MPI_Sendrecv(t0(:,:,zf), size(t0(:,:,zf)), mpi_double_precision, right, tag, &
                               t0(:,:,zf+1), size(t0(:,:,zf+1)), mpi_double_precision, right, tag, &
@@ -217,12 +221,14 @@ subroutine heat_sim_3D(jmean, temp, tissue, numpoints, id, numproc, new_comm, ri
                 pulseCount = 0.
                 repetitionCount = 0.
             end if
+
             pulseCount = pulseCount + delt
             repetitionCount = repetitionCount + delt
             time = time + delt
             ! call Arrhenius(t0, time, Ttmp, zi, zf, numpoints)
         end do
 
+        !collate results
         call mpi_allgather(t0(:,:,zi:zf), size(t0(:,:,zi:zf)), mpi_double_precision, &
                         temp(:,:,zi:zf), size(temp(:,:,zi:zf)), mpi_double_precision, new_comm)
 
@@ -236,6 +242,7 @@ subroutine heat_sim_3D(jmean, temp, tissue, numpoints, id, numproc, new_comm, ri
 
 
     subroutine initThermalCoeff(delt, numpoints, xmax, ymax, zmax)
+    !init all thermal variables
 
         use thermalConstants
         use constants, only : nxg, nyg, nzg, spotsPerRow, spotsPerCol
@@ -296,6 +303,7 @@ subroutine heat_sim_3D(jmean, temp, tissue, numpoints, id, numproc, new_comm, ri
 
 
     subroutine setupThermalCoeff(temp, numpoints)
+    !update thermal/optical variables
 
         use constants, only : nxg, nyg, nzg
         use iarray,    only : rhokap
@@ -336,7 +344,8 @@ subroutine heat_sim_3D(jmean, temp, tissue, numpoints, id, numproc, new_comm, ri
 
 
     subroutine Arrhenius(temp, delt, tissue, zi, zf, numpoints)
-
+    ! calculate tisue damage
+    
         implicit none
 
         integer, intent(IN)    :: zi,zf, numpoints

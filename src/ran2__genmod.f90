@@ -1,4 +1,4 @@
-        !COMPILER-GENERATED INTERFACE MODULE: Wed Jun  6 14:15:57 2018
+        !COMPILER-GENERATED INTERFACE MODULE: Wed Jun 13 14:22:39 2018
         ! This source file is for reference only and may not completely
         ! represent the generated interface used by the compiler.
         MODULE RAN2__genmod

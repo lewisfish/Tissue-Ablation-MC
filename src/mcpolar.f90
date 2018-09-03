@@ -16,9 +16,8 @@ use inttau2
 use ch_opt
 use stokes_mod
 use writer_mod
-use Heat, only : power, delt, energyPerPixel, laser_flag, laserOn, loops, pulseCount, pulselength, pulsesToDo&
-                 , repetitionCount, repetitionRate_1, time, total_time, initThermalCoeff, heat_sim_3d, watercontent,loops_left,q,&
-                 setupThermalCoeff
+use Heat, only : power, delt, energyPerPixel, laser_flag, laserOn, loops, pulseCount, pulselength, pulsesToDo,&
+                 repetitionCount, repetitionRate_1, time, total_time, initThermalCoeff, heat_sim_3d, watercontent,setupThermalCoeff
 use utils
 
 implicit none
@@ -93,11 +92,6 @@ open(newunit=u,file=trim(resdir)//'input.params',status='old')
 
 ! set seed for rnd generator. id to change seed for each process
 iseed = -95648324 + id
-
-!****** setup up arrays and bin numbers/dimensions
-
-!***** Set up constants, pi and 2*pi  ********************************
-
 iseed = -abs(iseed)  ! Random number seed must be negative for ran2
 
 call init_opt1
@@ -113,31 +107,14 @@ call gridset(xmax, ymax, zmax, id)
 !***** for roundoff effects when crossing cell walls
 delta  = 1.e-8*(2.*zmax/nzg)
 nscatt = 0
+
+!barrier to ensure correct timingd
 call MPI_Barrier(MPI_COMM_WORLD)
 call cpu_time(start)
+
 !loop over photons 
 print*,'Photons now running on core: ',id
 
-! pulsesDone=0
-! open(newunit=u,file="/home/lewis/phdshizz/ablation/bin/temp-mid.dat",access='stream',form='unformatted')
-! read(u)temp(0:n+1,0:n+1,0:n+1)
-! close(u)
-
-! temp = temp + 273.d0
-! call initThermalCoeff(delt, N, xmax, ymax, zmax)
-
-
-! open(newunit=u,file="/home/lewis/phdshizz/ablation/bin/rhokap-mid.dat",access='stream',form='unformatted')
-! read(u)rhokap
-! close(u)
-
-! open(newunit=u,file="/home/lewis/phdshizz/ablation/bin/water-mid.dat",access='stream',form='unformatted')
-! read(u)watercontent
-! close(u)
-
-! open(newunit=u,file="/home/lewis/phdshizz/ablation/bin/q-mid.dat",access='stream',form='unformatted')
-! read(u)q
-! close(u)
 
 temp = 5.d0 + 273.d0
 temp(N+1,:,:) = 5.+273.  ! side face
@@ -164,11 +141,11 @@ do while(time <= total_time)
             print *, str(j)//' scattered photons completed on core: '//str(id)
          end if
           
-      !***** Release photon from point source *******************************
+      !***** Release photon *******************************
          ! call sourcephERYAG(xmax,ymax,zmax,xcell,ycell,zcell,iseed)
          call sourcephCO2(xmax,ymax,zmax,xcell,ycell,zcell,iseed)
 
-      !****** Find scattering location
+      !****** Find scattering/absorb location
          call tauint1(xmax,ymax,zmax,xcell,ycell,zcell,tflag,iseed,delta)
             
       !******** Photon scatters in grid until it exits (tflag=TRUE) 
@@ -176,21 +153,25 @@ do while(time <= total_time)
                tflag = .true.
                exit
          end do
-      end do      ! end loop over nph photons
+      end do      ! end loop over j photons
+
+      !reduce jmean from all processess
       jmeanGLOBAL = 0.d0
       call MPI_REDUCE(jmean, jmeanGLOBAL, (nxg*nyg*nzg),MPI_DOUBLE_PRECISION, MPI_SUM,0,new_comm)
 
       jmeanGLOBAL = jmeanGLOBAL * ((power/81.)/(nphotons*numproc*(2.*xmax*1.d-2/nxg)*(2.*ymax*1.d-2/nyg)*(2.*zmax*1.d-2/nzg)))
    end if
+
+   !do heat simulation
    call heat_sim_3d(jmeanGLOBAL, temp, tissue, N, id, numproc, new_comm, right, left, counter)
 
 
    ! tissueGLOBAL = 0.
-
    ! call MPI_allREDUCE(tissue, tissueGLOBAL, (nxg*nyg*nzg),MPI_DOUBLE_PRECISION, MPI_SUM,new_comm)
 
+   !ablate tissue
    do r = 1, N
-      do w= 1, N
+      do w = 1, N
          do e = 1, N
             if(temp(r,w,e) >= ablateTemp + 273.d0)then
                ablateFlag = .TRUE.
@@ -201,11 +182,14 @@ do while(time <= total_time)
       end do
    end do
 
-  call setupThermalCoeff(temp, N)
+   !update thermal/optical properties
+   call setupThermalCoeff(temp, N)
 
    counter = counter + 1
    jmean = 0.
 end do
+   
+   !write out results
    if(id == 0)then
 
          open(newunit=u,&

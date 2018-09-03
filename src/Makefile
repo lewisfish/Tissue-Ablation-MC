@@ -9,8 +9,6 @@ FCDEBUG = -g -debug -traceback -check all -CB -CU -CA -fpe0
 FCBUILD = -g -debug -traceback -check all -CB -CA -CU -warn all -stand f08
 endif
 
-PROGRAM =  mcgrid 
-
 SRCS =      ran2.f \
 	      utils.f90 \
             constants.f90 \

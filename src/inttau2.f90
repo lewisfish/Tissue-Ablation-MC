@@ -42,6 +42,7 @@ CONTAINS
          if(taurun + taucell < tau)then
             taurun = taurun + taucell
             d = d + dcell
+            !photon absoption estimator
             jmean(celli, cellj, cellk) = jmean(celli, cellj, cellk) + dcell*rhokap(celli,cellj,cellk)
 
             call update_pos(xcur, ycur, zcur, celli, cellj, cellk, dcell, .TRUE., dir, delta)
@@ -276,6 +277,4 @@ CONTAINS
       
       
    end subroutine repeat_bounds
-   
-   
 end module inttau2
