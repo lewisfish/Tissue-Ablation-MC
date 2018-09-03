@@ -15,13 +15,10 @@ The codes simulate the transfer of light through tissue/phantoms and calculates 
             opt_prop.f90         tracks optical properties of the system
             subs.f90             inits arrays and directory paths 
             ch_opt.f90           sets rhokap and albedo arrays with correct values
-            density.f90          currently does nothing...
             gridset.f90          sets up the various grids
             inttau2.f90          generates a tau value and integrates through the grid
-            stokes.f90           scatters the photon
             sourceph.f90         photon source subroutine
             writer.f90           writes out results
-            shrinkarray.f90      Subroutine to shrink arrays down
             3dFD.f90             Heat simulation
             mcpolar.f90          main program. calls heat sim and does MC sim
 
@@ -49,9 +46,6 @@ The codes simulate the transfer of light through tissue/phantoms and calculates 
    complies and runs the code on (number of cores). If left with nothing the default is 1 core.
 
 #### To do/implement
-
-   - Better tissue damage model
-   - Pulsed laser
-   - Correct optical properties
-   - Correct normalisation of fluence
+   
+   - Speed up if possible
    - More...
