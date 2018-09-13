@@ -14,7 +14,6 @@ use gridset_mod
 use sourceph_mod
 use inttau2
 use ch_opt
-use stokes_mod
 use writer_mod
 use Heat, only : power, delt, energyPerPixel, laser_flag, laserOn, loops, pulseCount, pulselength, pulsesToDo,&
                  repetitionCount, repetitionRate_1, time, total_time, initThermalCoeff, heat_sim_3d, watercontent,setupThermalCoeff
@@ -34,6 +33,7 @@ integer          :: right, left, id, numproc, dims(2), ndims, tag,r,w,e
 logical          :: periods(1), reorder, ablateFlag=.FALSE.
 
 
+!start MPI
 call MPI_init()
 comm    = MPI_COMM_WORLD
 call MPI_Comm_size(comm, numproc)
@@ -47,7 +47,7 @@ call alloc_array(numproc)
 call zarray
 
 N = nzg ! points for heat sim
-allocate(tissue(nxg, nyg, nzg), tissueGLOBAL(nxg,nyg,nzg))!, q(nxg,nyg,nzg))
+allocate(tissue(nxg, nyg, nzg), tissueGLOBAL(nxg,nyg,nzg))
 allocate(temp(0:N+1, 0:N+1, 0:N+1))
 
 
@@ -124,7 +124,7 @@ temp(:,N+1,:) = 5.+273.  ! back face
 temp(:,:,0) = 25.+273.  ! bottom face
 temp(:,:,N+1) = 25.+273.  ! top face 
 call initThermalCoeff(delt, N, xmax, ymax, zmax)
-
+stop
 
 print*,energyPerPixel,int(total_time/delt),pulselength,delt,int(pulselength/delt)
 
@@ -132,8 +132,6 @@ do while(time <= total_time)
    if(laser_flag)then
 
       do j = 1, nphotons
-
-         call init_opt1
 
          tflag=.FALSE.
 
@@ -169,21 +167,9 @@ do while(time <= total_time)
    ! tissueGLOBAL = 0.
    ! call MPI_allREDUCE(tissue, tissueGLOBAL, (nxg*nyg*nzg),MPI_DOUBLE_PRECISION, MPI_SUM,new_comm)
 
-   !ablate tissue
-   do r = 1, N
-      do w = 1, N
-         do e = 1, N
-            if(temp(r,w,e) >= ablateTemp + 273.d0)then
-               ablateFlag = .TRUE.
-               rhokap(r,w,e) = 0.d0
-               temp(r,w,e) = 273.d0+25.d0
-            end if
-         end do
-      end do
-   end do
-
    !update thermal/optical properties
-   call setupThermalCoeff(temp, N)
+   call setupThermalCoeff(temp, N, ablateTemp)
+
 
    counter = counter + 1
    jmean = 0.
@@ -191,34 +177,7 @@ end do
    
    !write out results
    if(id == 0)then
-
-         open(newunit=u,&
-      file=trim(fileplace)//"ErYAG/jmean-timestep-deltdiv100-"&
-           //str(nzg)//"-"//str(ablateTemp,3)//"-"//str(energyPerPixel,3)//".dat" &
-          ,access="stream",form="unformatted", status="replace")
-      write(u)jmeanGLOBAL
-      close(u)
-
-      open(newunit=u,&
-      file=trim(fileplace)//"ErYAG/rhokap-timestep-deltdiv100-"&
-           //str(nzg)//"-"//str(ablateTemp,3)//"-"//str(energyPerPixel,3)//".dat" &
-          ,access="stream",form="unformatted", status="replace")
-      write(u)rhokap(1:nxg, 1:nyg, 1:nzg)
-      close(u)
-
-      open(newunit=u,&
-      file=trim(fileplace)//"ErYAG/temp-timestep-deltdiv100-"&
-         //str(nzg)//"-"//str(ablateTemp,3)//"-"//str(energyPerPixel,3)//"-"//str(pulsesToDo)//".dat" &
-          ,access="stream",form="unformatted", status="replace")
-      write(u)temp - 273.
-      close(u)
-
-      open(newunit=u,&
-      file=trim(fileplace)//"ErYAG/water-timestep-deltdiv100-"&
-         //str(nzg)//"-"//str(ablateTemp,3)//"-"//str(energyPerPixel,3)//".dat" &
-          ,access="stream",form="unformatted", status="replace")
-      write(u)watercontent
-      close(u)
+      call writer(xmax, ymax, zmax, nphotons, numproc, ablateTemp, temp)
    end if
 
 call cpu_time(finish)

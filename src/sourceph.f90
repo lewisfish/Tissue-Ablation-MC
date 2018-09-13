@@ -26,7 +26,7 @@ module sourceph_mod
             gridWidth   = 2. * xmax!cm
             gridHeight   = 2. * ymax!cm
             spotsTotal  = spotsPerRow * spotsPerCol
-            spotSize    = 150d-4 !um
+            spotSize    = 250d-4 !um
             spotGapRow  = (gridWidth - (spotsPerRow * spotSize/2.)) / (spotsPerRow)
             spotGapCol  = (gridHeight - (spotsPercol * spotSize/2.)) / (spotsPerCol) 
 

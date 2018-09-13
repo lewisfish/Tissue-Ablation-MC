@@ -18,14 +18,11 @@ SRCS =      ran2.f \
             opt_prop.f90 \
             subs.f90 \
             ch_opt.f90 \
-            density.f90 \
             gridset.f90 \
             inttau2.f90 \
-            stokes.f90 \
             sourceph.f90 \
-            writer.f90 \
-            shrinkarray.f90 \
             3dFD.f90 \
+            writer.f90 \
             mcpolar.f90 
                         
 OBJECTS = $(SRCS:.f90=.o)

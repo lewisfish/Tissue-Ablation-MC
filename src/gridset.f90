@@ -5,7 +5,6 @@ module gridset_mod
    contains
       subroutine gridset(xmax,ymax,zmax,id)
 
-         use density_mod
          use constants, only : nxg,nyg,nzg
          use iarray, only    : rhokap, xface, yface, zface, rhokap
          use opt_prop, only  : kappa
@@ -30,7 +29,7 @@ module gridset_mod
          do i = 1, nzg+1
             zface(i) = (i-1) * 2. * zmax/nzg
          end do
-         call init_opt4
+         call init_opt1
          !**************  Loop through x, y, and z to set up grid density and refractive index grid.  ****
          rhokap = 0.
          do i = 1, nxg

@@ -14,7 +14,7 @@ CONTAINS
 
    hgg = 0.9
    g2  = hgg**2.
-   mua = 865.13   ! taken from water absop data 12000.d0!
+   mua = 670.d0   ! Effective infrared absorption coefficient for photothermal radiometric measurements in biological tissues
    mus = 0.!. / (1. - hgg)
 
    kappa  = mus + mua

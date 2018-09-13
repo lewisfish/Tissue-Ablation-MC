@@ -4,10 +4,10 @@ module thermalConstants
 
     real, parameter :: skinThermalCond=0.209d0, skinDensity=1070.d0, skinHeatCap=3400.d0
     real, parameter :: airHeatCap=1.006d3, tempAir=25.d0+273.d0, tempAir4=tempAir**4
-    real, parameter :: S_B_Constant=5.670367d-8, h=10.d0, eps=0.98d0,lw=2256.d3
+    real, parameter :: h=10.d0, eps=0.98d0,lw=2256.d3
     real, parameter :: skinAlpha=skinThermalCond/(skinDensity * skinHeatCap)
-    real, parameter :: waterContentInit=.80!%
-    real            :: skinBeta, QVapor
+    real, parameter :: waterContentInit=.75, proteinContent=1.d0-waterContentInit!%
+    real            :: skinDensityInit, QVapor
 
     !skinDensity    : 1020 Kg/m3    source 10.1109/TBME.2009.2033464  burn papers says: 1093-1190
     !skinThermalCond: 0.21 W/m K    source burn paper- pig skin
@@ -19,7 +19,6 @@ module thermalConstants
 
     !lw: J/kg latent heat of vaporisation water
 
-    ! S_B_Constant: stefan-Boltzmann constant
     ! h: convective constant W/m2 K  between 2-10                   ************need source************
     ! eps: emissivity                           ************need source************
 
@@ -38,7 +37,7 @@ module thermalConstants
                 print*,i,'loop #'
                 error stop "Negative temp in kelvin"
             end if
-            airThermalCond = a * exp(-b * (T - 273.15d0)) + c
+            airThermalCond = 31.62d-3!a * exp(-b * (T - 273.15d0)) + c
         end function airThermalCond
 
 
@@ -74,7 +73,8 @@ module thermalConstants
 
             real, intent(IN) :: waterContent
 
-            getSkinDensity = 1.d0 / (6.16d-5 * waterContent + 9.38d-4) !! linear function
+            getSkinDensity = 100.d0 / (waterContent + 0.649d0*proteinContent) !new function with protein
+            !getSkinDensity = 1.d0 / (6.16d-5 * waterContent + 9.38d-4) !! linear function
             ! getSkinDensity = 1070d0 / (1 + exp(10*(waterContent - 0.5)))**(1.d0/74.d0) !!logistic funtion
             ! getSkinDensity = 3.489 * exp(-6.d0 * (waterContent - .5)) + 1000.d0 !!exponetial function
 
@@ -88,7 +88,8 @@ module thermalConstants
 
             real, intent(IN) :: waterContent
 
-            getSkinHeatCap = 2.5d3 * waterContent + 1.7d3
+            getSkinHeatCap = 100.d0*(4.2*waterContent + 1.09d0*proteinContent) !new function with protein
+            !getSkinHeatCap = 2.5d3 * waterContent + 1.7d3
 
         end function getSkinHeatCap
 
@@ -100,7 +101,8 @@ module thermalConstants
 
             real, intent(IN) :: waterContent, currentDensity
 
-            getSkinThermalCond = currentDensity*1.d-3 * (.454 * waterContent + 0.174d0)
+            getSkinThermalCond = currentDensity * (6.28d-4*waterContent + 1.17d-4*proteinContent)!new function with protein
+            !getSkinThermalCond = currentDensity*1.d-3 * (.454 * waterContent + 0.174d0)
 
         end function getSkinThermalCond
 end module thermalConstants
