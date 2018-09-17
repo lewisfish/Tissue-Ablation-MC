@@ -1,6 +1,9 @@
 jmean-ablation/
 bin/
 build/
+test heat stuff/
+validation of heat code/
+testParams.py
 *.o
 *.mod
 data/

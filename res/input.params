@@ -1,12 +1,12 @@
-12500           nphotons
-0.015              xmax (cm)
-0.015              ymax (cm)
-0.25              zmax (cm)
+50000           nphotons
+0.03              xmax (cm)
+0.03              ymax (cm)
+0.07              zmax (cm)
 1.0             n1
 1.38              n2
-1.0         total_time (s)
+1.         total_time (s)
 1         loops (how many heat loops to do before redoing MCRT)
-1000000./1.        repetitionRate_1 (Hz)
-400          energyPerPixel (mJ)
-450       ablatetemp (C)
+10000000./1.        repetitionRate_1 (Hz)
+200          energyPerPixel (mJ)
+400       ablatetemp (C)
 1         pulses to do

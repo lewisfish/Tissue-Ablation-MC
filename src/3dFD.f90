@@ -307,7 +307,6 @@ subroutine heat_sim_3D(jmean, temp, tissue, numpoints, id, numproc, new_comm, ri
 
         use constants, only : nxg, nyg, nzg
         use iarray,    only : rhokap
-        use opt_prop,  only : mua
         use thermalConstants
 
         implicit none
@@ -324,23 +323,9 @@ subroutine heat_sim_3D(jmean, temp, tissue, numpoints, id, numproc, new_comm, ri
             do j = 1, nyg
                 do i = 1, nxg
                     !ablate tissue
-
-                    ! if(temp(i,j,k) >= ablateTemp + 273.d0)then
-
-                    ! else
-                    !     if(rhokap(i,j,k) <= 0.001)then
-                    !         rhokap(i,j,k) = 0.d0
-                    !         density(i,j,k) = airDensity(temp(i,j,k))
-                    !         heatcap(i,j,k) = 1.006d3
-                    !     else
-
-                    !     end if
-                    ! end if
-
-
                     if(temp(i,j,k) >= ablateTemp + 273.d0)then
                         rhokap(i,j,k) = 0.d0
-                        temp(i,j,k) = 273.d0+25.d0
+                        ! temp(i,j,k) = 273.d0+25.d0
                     elseif(rhokap(i,j,k) > 0.)then
                         if(temp(i,j,k) >= 273.+ablateTemp)print*,"error!!!!!!!!!!!!!!!!!!11",rhokap(i,j,k)
                         density(i,j,k) = getSkinDensity(WaterContent(i,j,k))

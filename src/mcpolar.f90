@@ -124,7 +124,6 @@ temp(:,N+1,:) = 5.+273.  ! back face
 temp(:,:,0) = 25.+273.  ! bottom face
 temp(:,:,N+1) = 25.+273.  ! top face 
 call initThermalCoeff(delt, N, xmax, ymax, zmax)
-stop
 
 print*,energyPerPixel,int(total_time/delt),pulselength,delt,int(pulselength/delt)
 
