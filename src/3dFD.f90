@@ -307,6 +307,7 @@ subroutine heat_sim_3D(jmean, temp, tissue, numpoints, id, numproc, new_comm, ri
 
         use constants, only : nxg, nyg, nzg
         use iarray,    only : rhokap
+        use opt_prop,  only : mu_water, mu_protein
         use thermalConstants
 
         implicit none
@@ -327,9 +328,9 @@ subroutine heat_sim_3D(jmean, temp, tissue, numpoints, id, numproc, new_comm, ri
                         rhokap(i,j,k) = 0.d0
                         ! temp(i,j,k) = 273.d0+25.d0
                     elseif(rhokap(i,j,k) > 0.)then
-                        if(temp(i,j,k) >= 273.+ablateTemp)print*,"error!!!!!!!!!!!!!!!!!!11",rhokap(i,j,k)
+                        if(temp(i,j,k) >= 273.+ablateTemp)print*,"error! ablation when no ablation should take place",rhokap(i,j,k)
                         density(i,j,k) = getSkinDensity(WaterContent(i,j,k))
-                        rhokap(i,j,k) = waterContent(i,j,k) * 666.66666d0 + 170.d0
+                        rhokap(i,j,k) = watercontent(i,j,k) * mu_water + mu_protein
                         heatCap(i,j,k) = getSkinHeatCap(waterContent(i,j,k))
 
                         kappa(i,j,k) = getSkinThermalCond(WaterContent(i,j,k), density(i,j,k))
@@ -352,6 +353,8 @@ subroutine heat_sim_3D(jmean, temp, tissue, numpoints, id, numproc, new_comm, ri
     subroutine Arrhenius(temp, delt, tissue, zi, zf, numpoints)
     ! calculate tisue damage
 
+        use iarray, only : rhokap
+
         implicit none
 
         integer, intent(IN)    :: zi,zf, numpoints
@@ -367,7 +370,7 @@ subroutine heat_sim_3D(jmean, temp, tissue, numpoints, id, numproc, new_comm, ri
         do z = zi, zf
             do y = 1, numpoints
                 do x = 1, numpoints
-                    if(temp(x, y, z) >= 44+273.)then
+                    if(temp(x, y, z) >= 44+273. .and. rhokap(x, y, z) >= 0.1)then
                         tissue(x, y, z) = tissue(x, y, z) + delt*A*exp(-G/(R*(temp(x,y,z))))
                     end if
                 end do

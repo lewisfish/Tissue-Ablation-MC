@@ -14,7 +14,9 @@ CONTAINS
 
    hgg = 0.9
    g2  = hgg**2.
-   mua = 670.d0   ! Effective infrared absorption coefficient for photothermal radiometric measurements in biological tissues
+   mu_water = 670.d0
+   mu_protein = 170.d0
+   mua = mu_water + mu_protein! Effective infrared absorption coefficient for photothermal radiometric measurements in biological tissues
    mus = 0.!. / (1. - hgg)
 
    kappa  = mus + mua
