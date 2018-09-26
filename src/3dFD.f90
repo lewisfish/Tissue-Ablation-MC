@@ -20,7 +20,7 @@ subroutine heat_sim_3D(jmean, temp, tissue, numpoints, id, numproc, new_comm, ri
 
         use mpi_f08
         use utils,     only : str
-        use thermalConstants, only : QVapor, getSkinHeatCap, getSkinDensity, getSkinThermalCond, h, tempAir
+        use thermalConstants, only : QVapor, getSkinHeatCap, getSkinDensity, getSkinThermalCond
 
         implicit none
         
@@ -326,11 +326,11 @@ subroutine heat_sim_3D(jmean, temp, tissue, numpoints, id, numproc, new_comm, ri
                     !ablate tissue
                     if(temp(i,j,k) >= ablateTemp + 273.d0)then
                         rhokap(i,j,k) = 0.d0
-                        ! temp(i,j,k) = 273.d0+25.d0
+                        !temp(i,j,k) = 273.d0+25.d0
                     elseif(rhokap(i,j,k) > 0.)then
                         if(temp(i,j,k) >= 273.+ablateTemp)print*,"error! ablation when no ablation should take place",rhokap(i,j,k)
                         density(i,j,k) = getSkinDensity(WaterContent(i,j,k))
-                        rhokap(i,j,k) = watercontent(i,j,k) * mu_water + mu_protein
+                        rhokap(i,j,k) = watercontent(i,j,k) * mu_water + mu_protein!waterContent(i,j,k) * 666.66666d0 + 170.d0
                         heatCap(i,j,k) = getSkinHeatCap(waterContent(i,j,k))
 
                         kappa(i,j,k) = getSkinThermalCond(WaterContent(i,j,k), density(i,j,k))
@@ -340,9 +340,9 @@ subroutine heat_sim_3D(jmean, temp, tissue, numpoints, id, numproc, new_comm, ri
                         density(i,j,k) = airDensity(temp(i,j,k))
                         heatcap(i,j,k) = 1.006d3
                         rhokap(i,j,k) = 0.
-                        kappa(i,j,k) = getSkinThermalCond(WaterContent(i,j,k), density(i,j,k))
+                        kappa(i,j,k) = airThermalCond(temp(i,j,k), loops_left)
                         alpha(i,j,k) = kappa(i,j,k) / (density(i,j,k) * heatcap(i,j,k))
-                        coeff(i,j,k) = delt/ (airDensity(temp(i,j,k)) * airHeatCap)
+                        coeff(i,j,k) = delt/ (airDensity(temp(i,j,k)) * heatcap(i,j,k))
                     end if
                 end do
             end do

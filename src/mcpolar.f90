@@ -15,7 +15,7 @@ use sourceph_mod
 use inttau2
 use ch_opt
 use writer_mod
-use Heat, only : power, delt, energyPerPixel, laser_flag, laserOn, loops, pulseCount, pulselength, pulsesToDo,&
+use Heat, only : power, delt, energyPerPixel, laser_flag, laserOn, loops, pulseCount, pulselength, pulsesToDo,loops_left,&
                  repetitionCount, repetitionRate_1, time, total_time, initThermalCoeff, heat_sim_3d, watercontent,setupThermalCoeff
 use utils
 
@@ -168,7 +168,6 @@ do while(time <= total_time)
 
    !update thermal/optical properties
    call setupThermalCoeff(temp, N, ablateTemp)
-
 
    counter = counter + 1
    jmean = 0.
