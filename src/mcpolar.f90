@@ -16,21 +16,21 @@ use inttau2
 use ch_opt
 use writer_mod
 use Heat, only : power, delt, energyPerPixel, laser_flag, laserOn, loops, pulseCount, pulselength, pulsesToDo,loops_left,&
-                 repetitionCount, repetitionRate_1, time, total_time, initThermalCoeff, heat_sim_3d, watercontent,setupThermalCoeff
+                 repetitionCount, repetitionRate_1, time, total_time, initThermalCoeff, heat_sim_3d,setupThermalCoeff, arrhenius
 use utils
 
 implicit none
 
-integer           :: nphotons ,iseed, j, xcell, ycell, zcell, N, counter, u
+integer           :: nphotons ,iseed, j, xcell, ycell, zcell, N, counter, u, q, w, e
 logical           :: tflag
 double precision  :: nscatt
 real              :: xmax, ymax, zmax, delta, start, finish, ablateTemp
-real, allocatable :: temp(:,:,:), tissue(:,:,:), tissueGLOBAL(:,:,:)
+real, allocatable :: temp(:,:,:), tissue(:,:,:), ThresTime(:,:,:,:), ThresTimeGLOBAL(:,:,:,:)
 
 ! mpi variables
 type(mpi_comm)   :: comm, new_comm
-integer          :: right, left, id, numproc, dims(2), ndims, tag,r,w,e
-logical          :: periods(1), reorder, ablateFlag=.FALSE.
+integer          :: right, left, id, numproc, dims(2), ndims, tag
+logical          :: periods(1), reorder
 
 
 !start MPI
@@ -47,9 +47,12 @@ call alloc_array(numproc)
 call zarray
 
 N = nzg ! points for heat sim
-allocate(tissue(nxg, nyg, nzg), tissueGLOBAL(nxg,nyg,nzg))
+allocate(tissue(nxg, nyg, nzg))
 allocate(temp(0:N+1, 0:N+1, 0:N+1))
+allocate(ThresTime(nxg, nyg, nzg, 3))
 
+tissue = 0.d0
+ThresTime = 0.d0
 
 time            = 0.
 pulseCount      = 0.
@@ -147,8 +150,8 @@ do while(time <= total_time)
             
       !******** Photon scatters in grid until it exits (tflag=TRUE) 
          do while(tflag.eqv..FALSE.)
-               tflag = .true.
-               exit
+            tflag = .true.
+            exit
          end do
       end do      ! end loop over j photons
 
@@ -160,22 +163,43 @@ do while(time <= total_time)
    end if
 
    !do heat simulation
-   call heat_sim_3d(jmeanGLOBAL, temp, tissue, N, id, numproc, new_comm, right, left, counter)
+   call heat_sim_3d(jmeanGLOBAL, temp, N, id, numproc, new_comm, right, left, counter)
 
-
-   ! tissueGLOBAL = 0.
-   ! call MPI_allREDUCE(tissue, tissueGLOBAL, (nxg*nyg*nzg),MPI_DOUBLE_PRECISION, MPI_SUM,new_comm)
-
+   call arrhenius(temp, delt, tissue, ThresTime, 1, N, N)
    !update thermal/optical properties
    call setupThermalCoeff(temp, N, ablateTemp)
 
    counter = counter + 1
    jmean = 0.
+
+   if(mod(loops_left, 100) == 0 .and. id == 0)then
+      open(newunit=u,file="/home/lewis/phdshizz/ablation/bin/test/"//str(int(total_time/delt) - loops_left)//".dat",&
+         access="stream",form="unformatted")
+         write(u)temp(1:nxg,40,1:nzg)
+      close(u)
+   end if
+
 end do
    
+   allocate(ThresTimeGLOBAL(nxg, nyg, nzg, 3))
+   ThresTimeGLOBAL = 0.d0
+   call MPI_REDUCE(ThresTime, ThresTimeGLOBAL, nxg*nyg*nzg*3, MPI_DOUBLE_PRECISION, mpi_min, 0, new_comm)
+
    !write out results
    if(id == 0)then
-      call writer(xmax, ymax, zmax, nphotons, numproc, ablateTemp, temp)
+      !delete damage info about ablation crater
+      !as no tissue left to damage!
+
+      do q = 1, nxg
+         do w = 1, nyg
+            do e = 1, nzg
+               if(rhokap(q,w,e) <= 0.1)then
+                  tissue(q,w,e) = -1.d0
+               end if
+            end do
+         end do
+      end do
+      call writer(ablateTemp, temp, tissue, ThresTime)
    end if
 
 call cpu_time(finish)

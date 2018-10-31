@@ -38,13 +38,14 @@ module thermalConstants
         end function airDensity
 
 
-        elemental real function getWaterContent(Qcurrent)
+        elemental real function getWaterContent(Qcurrent, watercurrent)
 
             implicit none
 
-            real, intent(IN) :: Qcurrent
+            real, intent(IN) :: Qcurrent, watercurrent
 
-            getWaterContent = max(min(waterContentInit - waterContentInit * (Qcurrent / QVapor), waterContentInit), 0.0)
+            getWaterContent = max(min(min(waterContentInit - waterContentInit * (Qcurrent / QVapor), waterContentInit), &
+                                  watercurrent), 0.0)
 
         end function getWaterContent
 
