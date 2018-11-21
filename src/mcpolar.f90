@@ -15,8 +15,9 @@ use sourceph_mod
 use inttau2
 use ch_opt
 use writer_mod
-use Heat, only : power, delt, energyPerPixel, laser_flag, laserOn, loops, pulseCount, pulselength, pulsesToDo,loops_left,&
-                 repetitionCount, repetitionRate_1, time, total_time, initThermalCoeff, heat_sim_3d,setupThermalCoeff, arrhenius
+use Heat, only : power, delt, energyPerPixel, laser_flag, laserOn, loops, pulseCount, pulsesToDo,pulseFlag,getPWr,&
+                 repetitionCount, repetitionRate_1, time, total_time, initThermalCoeff, heat_sim_3d,setupThermalCoeff, arrhenius&
+                 ,realpulseLength
 use utils
 
 implicit none
@@ -35,7 +36,7 @@ logical          :: periods(1), reorder
 
 !start MPI
 call MPI_init()
-comm    = MPI_COMM_WORLD
+comm = MPI_COMM_WORLD
 call MPI_Comm_size(comm, numproc)
 
 
@@ -52,13 +53,14 @@ allocate(temp(0:N+1, 0:N+1, 0:N+1))
 allocate(ThresTime(nxg, nyg, nzg, 3))
 
 tissue = 0.d0
-ThresTime = 0.d0
+ThresTime = 0.d0!
 
 time            = 0.
 pulseCount      = 0.
 repetitionCount = 0.
 laserOn         = 1.
 laser_flag      = .TRUE.
+pulseFlag       = .FALSE.
 
 counter = 0
 
@@ -88,6 +90,7 @@ open(newunit=u,file=trim(resdir)//'input.params',status='old')
    read(u,*) total_time
    read(u,*) loops
    read(u,*) repetitionRate_1
+   read(u,*) power
    read(u,*) energyPerPixel
    read(u,*) ablateTemp
    read(u,*) pulsesToDo
@@ -119,16 +122,17 @@ call cpu_time(start)
 print*,'Photons now running on core: ',id
 
 
-temp = 5.d0 + 273.d0
+temp          = 5.d0 + 273.d0
 temp(N+1,:,:) = 5.+273.  ! side face
-temp(0,:,:) = 5.+273.    ! side face
-temp(:,0,:) = 5.+273. ! front face
+temp(0,:,:)   = 5.+273.    ! side face
+temp(:,0,:)   = 5.+273. ! front face
 temp(:,N+1,:) = 5.+273.  ! back face
-temp(:,:,0) = 25.+273.  ! bottom face
+temp(:,:,0)   = 25.+273.  ! bottom face
 temp(:,:,N+1) = 25.+273.  ! top face 
 call initThermalCoeff(delt, N, xmax, ymax, zmax)
 
-print*,energyPerPixel,int(total_time/delt),pulselength,delt,int(pulselength/delt)
+if(id == 0)print*,energyPerPixel,int(total_time/delt),realpulselength,delt,int(realpulselength/delt)
+
 
 do while(time <= total_time)
    if(laser_flag)then
@@ -142,7 +146,6 @@ do while(time <= total_time)
          end if
           
       !***** Release photon *******************************
-         ! call sourcephERYAG(xmax,ymax,zmax,xcell,ycell,zcell,iseed)
          call sourcephCO2(xmax,ymax,zmax,xcell,ycell,zcell,iseed)
 
       !****** Find scattering/absorb location
@@ -159,37 +162,28 @@ do while(time <= total_time)
       jmeanGLOBAL = 0.d0
       call MPI_REDUCE(jmean, jmeanGLOBAL, (nxg*nyg*nzg),MPI_DOUBLE_PRECISION, MPI_SUM,0,new_comm)
 
-      jmeanGLOBAL = jmeanGLOBAL * ((power/81.)/(nphotons*numproc*(2.*xmax*1.d-2/nxg)*(2.*ymax*1.d-2/nyg)*(2.*zmax*1.d-2/nzg)))
+      jmeanGLOBAL = jmeanGLOBAL * ((getPwr()/81.d0)/(nphotons*numproc*(2.*xmax*1.d-2/nxg)*(2.*ymax*1.d-2/nyg)*(2.*zmax*1.d-2/nzg)))
    end if
 
    !do heat simulation
    call heat_sim_3d(jmeanGLOBAL, temp, N, id, numproc, new_comm, right, left, counter)
 
-   call arrhenius(temp, delt, tissue, ThresTime, 1, N, N)
+   ! call arrhenius(temp, delt, tissue, ThresTime, 1, N, N)
    !update thermal/optical properties
    call setupThermalCoeff(temp, N, ablateTemp)
 
    counter = counter + 1
    jmean = 0.
-
-   if(mod(loops_left, 100) == 0 .and. id == 0)then
-      open(newunit=u,file="/home/lewis/phdshizz/ablation/bin/test/"//str(int(total_time/delt) - loops_left)//".dat",&
-         access="stream",form="unformatted")
-         write(u)temp(1:nxg,40,1:nzg)
-      close(u)
-   end if
-
 end do
    
-   allocate(ThresTimeGLOBAL(nxg, nyg, nzg, 3))
-   ThresTimeGLOBAL = 0.d0
-   call MPI_REDUCE(ThresTime, ThresTimeGLOBAL, nxg*nyg*nzg*3, MPI_DOUBLE_PRECISION, mpi_min, 0, new_comm)
+   ! allocate(ThresTimeGLOBAL(nxg, nyg, nzg, 3))
+   ! ThresTimeGLOBAL = 0.d0
+   ! call MPI_REDUCE(ThresTime, ThresTimeGLOBAL, nxg*nyg*nzg*3, MPI_DOUBLE_PRECISION, mpi_min, 0, new_comm)
 
    !write out results
    if(id == 0)then
       !delete damage info about ablation crater
       !as no tissue left to damage!
-
       do q = 1, nxg
          do w = 1, nyg
             do e = 1, nzg
@@ -199,7 +193,7 @@ end do
             end do
          end do
       end do
-      call writer(ablateTemp, temp, tissue, ThresTime)
+      call writer(ablateTemp, temp, tissue, xmax, ymax, zmax)!, ThresTimeGlobal)
    end if
 
 call cpu_time(finish)

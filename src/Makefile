@@ -1,3 +1,4 @@
+#http://swcarpentry.github.io/make-novice/
 ifeq ($(FCOMP),mpifort)
 FCFLAGS =  -freal-4-real-8 -O2 -march=native -flto
 FCDEBUG = -g -fbacktrace -fcheck=all -fbounds-check -ffpe-trap=invalid,overflow,underflow,denormal

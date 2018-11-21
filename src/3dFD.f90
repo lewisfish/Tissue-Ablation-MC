@@ -3,16 +3,16 @@ Module Heat
     implicit none
 
     real              :: pulseCount, repetitionCount, time, laserOn, total_time, repetitionRate_1, energyPerPixel
-    real              :: Power=70.d0, pulselength, delt
+    real              :: Power, pulselength, delt, realPulseLength
     real              :: dx, dy, dz, massVoxel, volumeVoxel
     real, allocatable :: coeff(:,:,:), kappa(:,:,:), density(:,:,:), heatcap(:,:,:), WaterContent(:,:,:), Q(:,:,:), alpha(:,:,:)
-    logical           :: laser_flag
-    integer           :: loops, pulsesToDo, pulsesDone, loops_left
+    logical           :: laser_flag, pulseFlag
+    integer           :: loops, pulsesToDo, pulsesDone, loops_left, mpi_calls
 
     private
-    public :: heat_sim_3D, pulseCount, repetitionCount, laserOn, laser_flag, time, initThermalCoeff, repetitionRate_1
-    public :: coeff, dx, dy, dz, loops, total_time, energyPerPixel, pulselength,Power, kappa,alpha
-    public :: delt, massVoxel, WaterContent, Q, pulsesToDo, pulsesDone, loops_left,setupThermalCoeff,Arrhenius
+    public :: power, delt, energyPerPixel, laser_flag, laserOn, loops, pulseCount, pulselength, pulsesToDo, repetitionCount
+    public :: repetitionRate_1, time,total_time, initThermalCoeff, heat_sim_3d, setupThermalCoeff, watercontent, Arrhenius,mpi_calls
+    public :: pulseFlag, realPulseLength, getPwr
 
     contains
 
@@ -89,9 +89,11 @@ subroutine heat_sim_3D(jmean, temp, numpoints, id, numproc, new_comm, right, lef
         end if
 
         jtmp = 0.
+        mpi_calls = mpi_calls + 1
         call mpi_scatter(jmean, size(jmean(:,:,zi:zf)), mpi_double_precision, jtmp(:,:,zi:zf), size(jtmp(:,:,zi:zf)), &
                          mpi_double_precision, 0, new_comm)
 
+        mpi_calls = mpi_calls + 1
         call mpi_scatter(Q, size(Q(:,:,zi:zf)), mpi_double_precision, Qtmp(:,:,zi:zf), size(Qtmp(:,:,zi:zf)), &
                  mpi_double_precision, 0, new_comm)
 
@@ -103,7 +105,7 @@ subroutine heat_sim_3D(jmean, temp, numpoints, id, numproc, new_comm, right, lef
 
         loops_left = int(total_time/(real(loops)*delt)) - counter
         if(id == 0 .and. mod(int(total_time/(real(loops)*delt)) - counter, 100) == 0)then
-            print"(a,F9.5,1x,a,I11)","Elapsed Time: ",time, "Loops left: ",loops_left
+            print"(a,F9.5,1x,a,I11,1x,F9.5)","Elapsed Time: ",time, "Loops left: ",loops_left,getPwr()
         end if
 
         !time loop
@@ -200,16 +202,19 @@ subroutine heat_sim_3D(jmean, temp, numpoints, id, numproc, new_comm, right, lef
 
             !halo swap
             !send_recv data to right
+            mpi_calls = mpi_calls + 1
             call MPI_Sendrecv(t0(:,:,zf), size(t0(:,:,zf)), mpi_double_precision, right, tag, &
                               t0(:,:,zf+1), size(t0(:,:,zf+1)), mpi_double_precision, right, tag, &
                               new_comm, recv_status)
             
             !send_recv data to left
+            mpi_calls = mpi_calls + 1
+
             call MPI_Sendrecv(t0(:,:,zi), size(t0(:,:,zi)), mpi_double_precision, left, tag, &
                               t0(:,:,zi-1), size(t0(:,:,zi-1)), mpi_double_precision, left, tag, &
                               new_comm, recv_status)
 
-            if(pulseCount >= pulseLength .and. laser_flag)then!turn laser off
+            if(pulseCount >= realpulseLength .and. laser_flag)then!turn laser off
                 laser_flag = .false.
                 laserOn = 0.
                 pulseCount = 0.
@@ -228,8 +233,11 @@ subroutine heat_sim_3D(jmean, temp, numpoints, id, numproc, new_comm, right, lef
         end do
 
         !collate results
+                mpi_calls = mpi_calls + 1
         call mpi_allgather(t0(:,:,zi:zf), size(t0(:,:,zi:zf)), mpi_double_precision, &
                         temp(:,:,zi:zf), size(temp(:,:,zi:zf)), mpi_double_precision, new_comm)
+
+        mpi_calls = mpi_calls + 1
 
         call mpi_allgather(Qtmp(:,:,zi:zf), size(Qtmp(:,:,zi:zf)), mpi_double_precision, &
                         Q(:,:,zi:zf), size(Q(:,:,zi:zf)), mpi_double_precision, new_comm)
@@ -285,12 +293,15 @@ subroutine heat_sim_3D(jmean, temp, numpoints, id, numproc, new_comm, right, lef
         ! delt = delt / 1.
 
         constd = (1.d0/dx**2) + (1.d0/dy**2) + (1.d0/dz**2)
-        delt   = 1.d0 / (alphatmp*constd)
+        delt   = 1.d0 / (1.d0*alphatmp*constd)
 
         coeff = 0.d0
         coeff(1:nxg,1:nyg,1:nzg) = alphatmp * delt / kappatmp
 
-        pulseLength = (energyPerPixel * 1.d-3 * real(spotsPerRow* spotsPerCol)) / Power
+        pulseLength = (energyPerPixel * 1.d-3 * real(spotsPerRow* spotsPerCol)) / Power!pulselength above avg pwr
+        realPulseLength = 2.d0 * pulseLength !total pulse length
+
+
 
         volumeVoxel = (2.d0*xmax*1.d-2/nxg) * (2.d0*ymax*1.d-2/nyg) * (2.d0*zmax*1.d-2/nzg)
         massVoxel = densitytmp*volumeVoxel
@@ -345,6 +356,34 @@ subroutine heat_sim_3D(jmean, temp, numpoints, id, numproc, new_comm, right, lef
             end do
         end do
     end subroutine setupThermalCoeff
+
+
+    real function getPwr()
+
+        implicit none
+
+
+        real :: m, c
+
+        m = power / pulseLength
+        c = 2.d0 * power
+
+        if(.not. laser_flag)then
+            getPwr = 0.d0
+        else
+            if(pulseFlag)then
+                getPwr = -m * time + c
+            else
+                if(time >= pulseLength)then
+                    pulseFlag=.true.
+                    getPwr = -m * time + c
+                else
+                    getPwr = m * time
+                end if
+            end if
+        end if
+
+    end function getPwr
 
 
     subroutine Arrhenius(temp, delt, tissue, Threstime, zi, zf, numpoints)

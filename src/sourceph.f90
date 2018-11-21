@@ -136,4 +136,56 @@ module sourceph_mod
         zcell=int(nzg*(zp+zmax)/(2.*zmax))+1
         !*****************************************************
     end subroutine sourcephERYAG
+
+
+    real function ranu(a, b, iseed)
+    ! return on call a random number and updated iseed   
+    ! random number is uniformly distributed between a and b
+    !  INPUT:
+    !        a       real     lower limit of boxcar
+    !        b       real     upper limit of boxcar
+    !        iseed   integer  seed integer used fot the random number generator
+    !  OUTPUT:
+    !        ranu    real     uniform random number
+    !        iseed   integer  seed used for next call
+
+        implicit none
+
+        real,    intent(IN)    :: a, b
+        integer, intent(INOUT) :: iseed
+        real :: ran2
+
+        ranu = a + ran2(iseed) * (b - a)
+    end function ranu
+
+    real function rang(avg, sigma, iseed)
+    ! return on call a random number and updated iseed   
+    ! random number is from a gaussian distrbution
+    ! used the Marsaglia polar method
+    !  INPUT:
+    !        avg       real     mean of gaussian dist.
+    !        sigma     real     var of gaussian dist
+    !        iseed     integer  seed integer used fot the random number generator
+    !  OUTPUT:
+    !        rang    real     gaussian distributed random number
+    !        iseed   integer  seed used for next call
+
+        implicit none
+
+        real,    intent(IN)    :: avg, sigma
+        integer, intent(INOUT) :: iseed
+        real :: u, s, tmp
+
+        s = 1.d0
+        do while(s.ge.1.)
+            u = ranu(-1.,1.,iseed)
+            s = ranu(-1.,1.,iseed)
+            s = s**2. + u**2.
+        end do
+        tmp = u*sqrt(-2.*log(s)/s)
+
+        rang = avg + sigma*tmp
+
+    end function rang
+
 end MODULE sourceph_mod
