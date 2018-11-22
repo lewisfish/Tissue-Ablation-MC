@@ -32,7 +32,7 @@ real, allocatable :: temp(:,:,:), tissue(:,:,:), ThresTime(:,:,:,:), ThresTimeGL
 type(mpi_comm)   :: comm, new_comm
 integer          :: right, left, id, numproc, dims(2), ndims, tag
 logical          :: periods(1), reorder
-
+character(len=3) :: gfd
 
 !start MPI
 call MPI_init()
@@ -99,6 +99,7 @@ open(newunit=u,file=trim(resdir)//'input.params',status='old')
 ! set seed for rnd generator. id to change seed for each process
 iseed = -95648324 + id
 iseed = -abs(iseed)  ! Random number seed must be negative for ran2
+
 
 call init_opt1
 
@@ -168,7 +169,7 @@ do while(time <= total_time)
    !do heat simulation
    call heat_sim_3d(jmeanGLOBAL, temp, N, id, numproc, new_comm, right, left, counter)
 
-   ! call arrhenius(temp, delt, tissue, ThresTime, 1, N, N)
+   call arrhenius(temp, delt, tissue, ThresTime, 1, N, N)
    !update thermal/optical properties
    call setupThermalCoeff(temp, N, ablateTemp)
 
@@ -176,9 +177,9 @@ do while(time <= total_time)
    jmean = 0.
 end do
    
-   ! allocate(ThresTimeGLOBAL(nxg, nyg, nzg, 3))
-   ! ThresTimeGLOBAL = 0.d0
-   ! call MPI_REDUCE(ThresTime, ThresTimeGLOBAL, nxg*nyg*nzg*3, MPI_DOUBLE_PRECISION, mpi_min, 0, new_comm)
+   allocate(ThresTimeGLOBAL(nxg, nyg, nzg, 3))
+   ThresTimeGLOBAL = 0.d0
+   call MPI_REDUCE(ThresTime, ThresTimeGLOBAL, nxg*nyg*nzg*3, MPI_DOUBLE_PRECISION, mpi_min, 0, new_comm)
 
    !write out results
    if(id == 0)then
@@ -193,7 +194,7 @@ end do
             end do
          end do
       end do
-      call writer(ablateTemp, temp, tissue, xmax, ymax, zmax)!, ThresTimeGlobal)
+      call writer(ablateTemp, temp, tissue, xmax, ymax, zmax, ThresTimeGlobal)
    end if
 
 call cpu_time(finish)

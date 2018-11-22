@@ -47,10 +47,17 @@ module sourceph_mod
             !http://mathworld.wolfram.com/DiskPointPicking.html
             !sample circle uniformly
             !sample radius between [0,r^2]
-            r = ran2(iseed) * (spotSize/2.)**2
-            theta = ran2(iseed) * twopi
-            x = sqrt(r) * cos(theta)
-            y = sqrt(r) * sin(theta)
+            ! r = ran2(iseed) * (spotSize/2.)**2
+            ! theta = ran2(iseed) * twopi
+            ! x = sqrt(r) * cos(theta)
+            ! y = sqrt(r) * sin(theta)
+            ! x = rang(0.d0, spotsize/4.d0, iseed)
+            ! y = rang(0.d0, spotsize/4.d0, iseed)
+
+            x = ranu(-spotSize/2.d0, spotSize/2.d0, iseed)
+            y = ranu(-spotSize/2.d0, spotSize/2.d0, iseed)
+
+
             !get final point
             xp = x !- cenx
             yp = y !- ceny

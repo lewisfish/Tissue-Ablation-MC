@@ -112,17 +112,25 @@ module utils
 
             implicit none
 
-            integer(int32),    intent(IN) :: i
+            integer(int32),    intent(IN)    :: i
             integer, optional, intent(IN) :: len
 
             character(len=:), allocatable :: str_I32
             character(len=100) :: string
+            integer            :: lentmp, lenuse
 
             write(string,'(I100.1)') I
 
             if(present(len))then
-                str_I32 = trim(adjustl(string))
-                str_I32 = trim(adjustl(str_I32(:len)))
+                lentmp = len_trim(adjustl(string))
+                lenuse = len
+
+                if(len >= lentmp)then
+                    str_I32 = repeat("0", lenuse - lentmp)//trim(adjustl(string))
+                else
+                    str_I32 = trim(adjustl(string))
+                    str_I32 = trim(adjustl(str_I32(:len)))                        
+                end if
             else
                 str_I32 = trim(adjustl(string))
             end if
@@ -135,17 +143,25 @@ module utils
 
             implicit none
 
-            integer(Int64),    intent(IN) :: i
+            integer(int64),    intent(IN)    :: i
             integer, optional, intent(IN) :: len
 
             character(len=:), allocatable :: str_I64
             character(len=100) :: string
+            integer            :: lentmp, lenuse
 
             write(string,'(I100.1)') I
 
             if(present(len))then
-                str_I64 = trim(adjustl(string))
-                str_I64 = trim(adjustl(str_I64(:len)))
+                lentmp = len_trim(adjustl(string))
+                lenuse = len
+
+                if(len >= lentmp)then
+                    str_I64 = repeat("0", lenuse - lentmp)//trim(adjustl(string))
+                else
+                    str_I64 = trim(adjustl(string))
+                    str_I64 = trim(adjustl(str_I64(:len)))                        
+                end if
             else
                 str_I64 = trim(adjustl(string))
             end if
