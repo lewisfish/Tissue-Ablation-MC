@@ -81,7 +81,7 @@ function run
   echo $(pwd)
   mv $pname "$bdirc" && echo " "&& echo "*****Install complete*****" && echo " "
 
-  # clear
+  clear
   cd ../bin
 
   if [ "$NUM_CORES" = "1" ]; then

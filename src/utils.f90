@@ -61,7 +61,7 @@ module utils
     end interface swap
 
     private
-    public :: str, swap, colour, mem_free
+    public :: str, swap, colour
     public :: bold, italic, underline, strikethrough, black, red, green, yellow, blue, magenta, cyan, white
     public :: black_b, red_b, green_b, yellow_b, blue_b, magenta_b, cyan_b, white_b
 
@@ -370,29 +370,4 @@ module utils
                 colourised = start//fmt1//'m'//string//achar(27)//end
             end if
         end function colour_real8
-
-
-        function mem_free()
-        ! reads /proc/meminfo to calculate how much RAM is avilable to use
-        ! 
-        !
-            use iso_fortran_env, only : int64 !as numbers are large
-
-            implicit none
-
-            integer(int64) :: mem_free
-
-            integer(int64)    :: i
-            character(len=15) :: tmp
-            integer           :: u
-
-            open(newunit=u,file='/proc/meminfo',status='old')
-
-            read(u,*)tmp, i
-            read(u,*)tmp, i
-            read(u,*)tmp, i
-
-            mem_free = i * 1024_int64 !convert from Kib to b 
-
-        end function mem_free
 end module utils

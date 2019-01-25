@@ -51,11 +51,11 @@ module sourceph_mod
             ! theta = ran2(iseed) * twopi
             ! x = sqrt(r) * cos(theta)
             ! y = sqrt(r) * sin(theta)
-            ! x = rang(0.d0, spotsize/4.d0, iseed)
-            ! y = rang(0.d0, spotsize/4.d0, iseed)
+            x = rang(0.d0, spotsize/4.d0, iseed)
+            y = rang(0.d0, spotsize/4.d0, iseed)
 
-            x = ranu(-spotSize/2.d0, spotSize/2.d0, iseed)
-            y = ranu(-spotSize/2.d0, spotSize/2.d0, iseed)
+            ! x = ranu(-spotSize/2.d0, spotSize/2.d0, iseed)
+            ! y = ranu(-spotSize/2.d0, spotSize/2.d0, iseed)
 
 
             !get final point

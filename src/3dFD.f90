@@ -242,20 +242,26 @@ subroutine heat_sim_3D(jmean, temp, numpoints, id, numproc, new_comm, right, lef
         call mpi_allgather(Qtmp(:,:,zi:zf), size(Qtmp(:,:,zi:zf)), mpi_double_precision, &
                         Q(:,:,zi:zf), size(Q(:,:,zi:zf)), mpi_double_precision, new_comm)
 
+
+        deallocate(T0)
+        deallocate(jtmp)
+        deallocate(Qtmp)
+
     end subroutine heat_sim_3D
 
 
-    subroutine initThermalCoeff(delt, numpoints, xmax, ymax, zmax)
+    subroutine initThermalCoeff(delt, numpoints, xmax, ymax, zmax, numproc)
     !init all thermal variables
 
         use thermalConstants
         use constants, only : nxg, nyg, nzg, spotsPerRow, spotsPerCol
+        use memoryModule, only : checkallocate, totalMem
 
         implicit none
 
         real,    intent(INOUT) :: delt
         real,    intent(IN)    :: xmax, ymax, zmax
-        integer, intent(IN)    :: numpoints
+        integer, intent(IN)    :: numpoints, numproc
 
         real :: densitytmp, alphatmp, kappatmp, heatCaptmp, constd
 
@@ -263,14 +269,14 @@ subroutine heat_sim_3D(jmean, temp, numpoints, id, numproc, new_comm, right, lef
         dy = (2.d0 * ymax * 1.d-2) / (numpoints + 2.d0)
         dz = (2.d0 * zmax * 1.d-2) / (numpoints + 2.d0)  
 
-        allocate(coeff(0:nxg+1, 0:nyg+1, 0:nzg+1))
-        allocate(alpha(0:nxg+1, 0:nyg+1, 0:nzg+1))
-        allocate(kappa(0:nxg+1, 0:nyg+1, 0:nzg+1))
-        allocate(density(0:nxg+1, 0:nyg+1, 0:nzg+1))
-        allocate(heatCap(0:nxg+1, 0:nyg+1, 0:nzg+1))
+        call checkallocate(coeff,   [nxg+1, nyg+1, nzg+1], "coeff",   numproc, [0,0,0])
+        call checkallocate(alpha,   [nxg+1, nyg+1, nzg+1], "alpha",   numproc, [0,0,0])
+        call checkallocate(kappa,   [nxg+1, nyg+1, nzg+1], "kappa",   numproc, [0,0,0])
+        call checkallocate(density, [nxg+1, nyg+1, nzg+1], "density", numproc, [0,0,0])
+        call checkallocate(heatCap, [nxg+1, nyg+1, nzg+1], "heatcap", numproc, [0,0,0])
 
-        allocate(Q(nxg, nyg, nzg))
-        allocate(watercontent(nxg, nyg, nzg))
+        call checkallocate(Q, [nxg, nyg, nzg], "Q", numproc)
+        call checkallocate(watercontent, [nxg, nyg, nzg], "watercontent", numproc)
 
         Q = 0.d0
         skinDensityInit = getSkinDensity(watercontentInit)

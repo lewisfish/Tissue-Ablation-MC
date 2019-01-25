@@ -19,6 +19,7 @@ use Heat, only : power, delt, energyPerPixel, laser_flag, laserOn, loops, pulseC
                  repetitionCount, repetitionRate_1, time, total_time, initThermalCoeff, heat_sim_3d,setupThermalCoeff, arrhenius&
                  ,realpulseLength
 use utils
+use memoryModule, only : checkallocate
 
 implicit none
 
@@ -26,7 +27,6 @@ integer           :: nphotons ,iseed, j, xcell, ycell, zcell, N, counter, u, q, 
 logical           :: tflag
 double precision  :: nscatt
 real              :: xmax, ymax, zmax, delta, start, finish, ablateTemp
-real, allocatable :: temp(:,:,:), tissue(:,:,:), ThresTime(:,:,:,:), ThresTimeGLOBAL(:,:,:,:)
 
 ! mpi variables
 type(mpi_comm)   :: comm, new_comm
@@ -40,17 +40,29 @@ comm = MPI_COMM_WORLD
 call MPI_Comm_size(comm, numproc)
 
 
+!setup topology variables
+tag     = 1
+dims    = 0
+periods = .false.
+reorder = .true.
+ndims   = 1
+
+!create cartesian topology on cpu
+call mpi_dims_create(numproc, ndims, dims)
+call mpi_cart_create(comm, ndims, dims, periods, reorder, new_comm)
+call mpi_comm_rank(new_comm, id)
+
 !set directory paths
 call directory
 
 !allocate and set arrays to 0
-call alloc_array(numproc)
+call alloc_array(numproc, id)
 call zarray
 
 N = nzg ! points for heat sim
-allocate(tissue(nxg, nyg, nzg))
-allocate(temp(0:N+1, 0:N+1, 0:N+1))
-allocate(ThresTime(nxg, nyg, nzg, 3))
+! allocate(tissue(nxg, nyg, nzg))
+! allocate(temp(0:N+1, 0:N+1, 0:N+1))
+! allocate(ThresTime(nxg, nyg, nzg, 3))
 
 tissue = 0.d0
 ThresTime = 0.d0!
@@ -64,17 +76,7 @@ pulseFlag       = .FALSE.
 
 counter = 0
 
-!setup topology variables
-tag     = 1
-dims    = 0
-periods = .false.
-reorder = .true.
-ndims   = 1
 
-!create cartesian topology on cpu
-call mpi_dims_create(numproc, ndims, dims)
-call mpi_cart_create(comm, ndims, dims, periods, reorder, new_comm)
-call mpi_comm_rank(new_comm, id)
 
 !get neighbours
 call mpi_cart_shift(new_comm, 0, 1, left, right)
@@ -130,14 +132,16 @@ temp(:,0,:)   = 5.+273. ! front face
 temp(:,N+1,:) = 5.+273.  ! back face
 temp(:,:,0)   = 25.+273.  ! bottom face
 temp(:,:,N+1) = 25.+273.  ! top face 
-call initThermalCoeff(delt, N, xmax, ymax, zmax)
+call initThermalCoeff(delt, N, xmax, ymax, zmax, numproc)
+
+
+!override total_time if set too low for laser to finish 1 pulse
+! if(int(total_time/delt) <= int(realpulseLength/delt))then
+!    total_time = delt * (realpulselength/delt + 2000.)
+! end if
 
 if(id == 0)print*,energyPerPixel,int(total_time/delt),realpulselength,delt,int(realpulselength/delt),total_time
 
-!override total_time if set too low for laser to finish 1 pulse
-if(int(total_time/delt) <= int(realpulseLength/delt))then
-   total_time = delt * (realpulselength/delt + 2000.)
-end if
 
 do while(time <= total_time)
    if(laser_flag)then
@@ -146,9 +150,9 @@ do while(time <= total_time)
 
          tflag=.FALSE.
 
-         if(mod(j,1000000) == 0)then
-            print *, str(j)//' scattered photons completed on core: '//str(id)
-         end if
+         ! if(mod(j,1000000) == 0)then
+         !    print *, str(j)//' scattered photons completed on core: '//str(id)
+         ! end if
           
       !***** Release photon *******************************
          call sourcephCO2(xmax,ymax,zmax,xcell,ycell,zcell,iseed)
@@ -181,7 +185,7 @@ do while(time <= total_time)
    jmean = 0.
 end do
    
-   allocate(ThresTimeGLOBAL(nxg, nyg, nzg, 3))
+   call checkallocate(ThresTimeGLOBAL, [nxg, nyg, nzg, 3], "ThresTimeGLOBAL", numproc)
    ThresTimeGLOBAL = 0.d0
    call MPI_REDUCE(ThresTime, ThresTimeGLOBAL, nxg*nyg*nzg*3, MPI_DOUBLE_PRECISION, mpi_min, 0, new_comm)
 

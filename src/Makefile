@@ -12,6 +12,7 @@ endif
 
 SRCS =      ran2.f \
 	      utils.f90 \
+            memory.f90 \
             constants.f90 \
             photon_vars.f90 \
             thermalConst_mod.f90 \
