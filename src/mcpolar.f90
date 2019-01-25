@@ -132,8 +132,12 @@ temp(:,:,0)   = 25.+273.  ! bottom face
 temp(:,:,N+1) = 25.+273.  ! top face 
 call initThermalCoeff(delt, N, xmax, ymax, zmax)
 
-if(id == 0)print*,energyPerPixel,int(total_time/delt),realpulselength,delt,int(realpulselength/delt)
+if(id == 0)print*,energyPerPixel,int(total_time/delt),realpulselength,delt,int(realpulselength/delt),total_time
 
+!override total_time if set too low for laser to finish 1 pulse
+if(int(total_time/delt) <= int(realpulseLength/delt))then
+   total_time = delt * (realpulselength/delt + 2000.)
+end if
 
 do while(time <= total_time)
    if(laser_flag)then
