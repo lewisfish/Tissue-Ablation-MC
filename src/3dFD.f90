@@ -379,10 +379,12 @@ subroutine heat_sim_3D(jmean, temp, numpoints, id, numproc, new_comm, right, lef
         else
             if(pulseFlag)then
                 getPwr = -m * time + c
+                if(getPwr < 0.d0)getPwr=0.d0
             else
                 if(time >= pulseLength)then
                     pulseFlag=.true.
                     getPwr = -m * time + c
+                    if(getPwr < 0.d0)getPwr=0.d0
                 else
                     getPwr = m * time
                 end if

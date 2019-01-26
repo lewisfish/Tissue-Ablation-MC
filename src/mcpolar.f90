@@ -76,8 +76,6 @@ pulseFlag       = .FALSE.
 
 counter = 0
 
-
-
 !get neighbours
 call mpi_cart_shift(new_comm, 0, 1, left, right)
 
@@ -168,9 +166,7 @@ do while(time <= total_time)
       end do      ! end loop over j photons
 
       !reduce jmean from all processess
-      jmeanGLOBAL = 0.d0
-      call MPI_REDUCE(jmean, jmeanGLOBAL, (nxg*nyg*nzg),MPI_DOUBLE_PRECISION, MPI_SUM,0,new_comm)
-
+      call MPI_allREDUCE(jmean, jmeanGLOBAL, (nxg*nyg*nzg),MPI_DOUBLE_PRECISION, MPI_SUM,new_comm)
       jmeanGLOBAL = jmeanGLOBAL * ((getPwr()/81.d0)/(nphotons*numproc*(2.*xmax*1.d-2/nxg)*(2.*ymax*1.d-2/nyg)*(2.*zmax*1.d-2/nzg)))
    end if
 
