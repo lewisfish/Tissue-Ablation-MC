@@ -35,7 +35,7 @@ subroutine heat_sim_3D(jmean, temp, numpoints, id, numproc, new_comm, right, lef
         !heat local variables
         real              :: u_xx, u_yy, u_zz, tempIncrease,kappaMinHalf, kappaPlusHalf, energyIncrease
         real              :: heatcapMinHalf, densityPlusHalf, densityMinHalf, heatcapPlusHalf, a, b, d
-        real, allocatable :: T0(:,:,:), jtmp(:,:,:), qtmp(:,:,:)
+        real, allocatable :: T0(:,:,:), jtmp(:,:,:), qtmp(:,:,:), tn(:,:,:)
         integer           :: i, j, k, p, size_x, size_y, size_z, xi, yi, zi, xf, yf, zf, N, tag,zsta,zfin
 
         !calculate size of domain
@@ -71,6 +71,7 @@ subroutine heat_sim_3D(jmean, temp, numpoints, id, numproc, new_comm, right, lef
 
         !allocate mesh
         allocate(T0(0:numpoints+1, 0:numpoints+1, zi-1:zf+1))
+        allocate(Tn(0:numpoints+1, 0:numpoints+1, zi-1:zf+1))
         allocate(jtmp(numpoints, numpoints, zi:zf))
         allocate(Qtmp(numpoints, numpoints, zi:zf))
         t0 = 0.
@@ -87,7 +88,7 @@ subroutine heat_sim_3D(jmean, temp, numpoints, id, numproc, new_comm, right, lef
         else
             call mpi_recv(t0, size(t0), mpi_double_precision, 0, tag, new_comm, recv_status)
         end if
-
+        tn = t0
         jtmp = 0.
         mpi_calls = mpi_calls + 1
         call mpi_scatter(jmean, size(jmean(:,:,zi:zf)), mpi_double_precision, jtmp(:,:,zi:zf), size(jtmp(:,:,zi:zf)), &
@@ -114,30 +115,22 @@ subroutine heat_sim_3D(jmean, temp, numpoints, id, numproc, new_comm, right, lef
             do k = zi, zf
                 do j = yi, yf
                     do i = xi, xf
-                        ! if((k == zf .and. id == numproc-1))then!B.Cs
-                        !     u_zz = (2.d0/dz**2) * (alpha(i,j,k+1)*t0(i,j,k+1) - alpha(i,j,k)*t0(i,j,k) &
-                        !            + (dz*h*alpha(i,j,k)/kappa(i,j,k)) * (tempAir - t0(i,j,k)))
-                        ! else
+                        !!adapted from Finite Differecne Methods in Heat Transfer Chapter 9. M. Ozisik
+                        kappaPlusHalf = .5d0 * (kappa(i,j,k) + kappa(i,j,k+1))
+                        kappaMinHalf = .5d0 * (kappa(i,j,k) + kappa(i,j,k-1))
 
-                            !!adapted from Finite Differecne Methods in Heat Transfer Chapter 9. M. Ozisik
-                            kappaPlusHalf = .5d0 * (kappa(i,j,k) + kappa(i,j,k+1))
-                            kappaMinHalf = .5d0 * (kappa(i,j,k) + kappa(i,j,k-1))
+                        densityPlusHalf = .5d0 * (density(i,j,k) + density(i,j,k+1))
+                        densityMinHalf = .5d0 * (density(i,j,k) + density(i,j,k-1))
 
-                            densityPlusHalf = .5d0 * (density(i,j,k) + density(i,j,k+1))
-                            densityMinHalf = .5d0 * (density(i,j,k) + density(i,j,k-1))
+                        heatcapPlusHalf = .5d0 * (heatcap(i,j,k) + heatcap(i,j,k+1))
+                        heatcapMinHalf = .5d0 * (heatcap(i,j,k) + heatcap(i,j,k-1))
 
-                            heatcapPlusHalf = .5d0 * (heatcap(i,j,k) + heatcap(i,j,k+1))
-                            heatcapMinHalf = .5d0 * (heatcap(i,j,k) + heatcap(i,j,k-1))
+                        a = 0.5d0 * (kappaMinHalf/(densityMinHalf * heatcapMinHalf)) * (1.d0/dz**2)
+                        d = 0.5d0 * (kappaPlusHalf/(densityPlusHalf * heatcapPlusHalf)) * (1.d0/dz**2)
+                        b = 0.5d0 * (a + d)
 
-                            a = 0.5d0 * (kappaMinHalf/(densityMinHalf * heatcapMinHalf)) * (1.d0/dz**2)
-                            d = 0.5d0 * (kappaPlusHalf/(densityPlusHalf * heatcapPlusHalf)) * (1.d0/dz**2)
-                            b = 0.5d0 * (a + d)
+                        u_zz = a*t0(i,j,k-1) - 2.d0*b*t0(i,j,k) + d*t0(i,j,k+1)
 
-                            u_zz = a*t0(i,j,k-1) - 2.d0*b*t0(i,j,k) + d*t0(i,j,k+1)
-
-                            ! u_zz = (1.d0 / dz**2) * (alpha(i,j,k-1) * t0(i,j,k-1) - 2. * alpha(i,j,k) * t0(i,j,k) + &
-                            !     alpha(i,j,k+1) * t0(i,j,k+1))
-                        ! end if
 
                         kappaPlusHalf = 0.5d0 * (kappa(i,j,k) + kappa(i,j+1,k))
                         kappaMinHalf = 0.5d0 * (kappa(i,j,k) + kappa(i,j-1,k))
@@ -170,28 +163,21 @@ subroutine heat_sim_3D(jmean, temp, numpoints, id, numproc, new_comm, right, lef
 
                         u_xx = a*t0(i-1,j,k) - 2.d0*b*t0(i,j,k) + d*t0(i+1,j,k)
 
-
-                        ! ! linear heat equation
-                        ! u_xx = (1.d0 / dx**2) * (alpha(i-1,j,k) * t0(i-1,j,k) - 2. *alpha(i,j,k) * t0(i,j,k) + &
-                        !         alpha(i+1,j,k) * t0(i+1,j,k))
-
-                        ! u_yy = (1.d0 / dy**2) * (alpha(i,j-1,k) * t0(i,j-1,k) - 2. *alpha(i,j,k) * t0(i,j,k) + &
-                        !         alpha(i,j+1,k) * t0(i,j+1,k))
-
                         tempIncrease = delt * (u_xx + u_yy + u_zz) 
                         energyIncrease = laserOn*jtmp(i,j,k)*delt*volumeVoxel + heatcap(i,j,k)*massVoxel*tempIncrease
                         !boil water
-                        if(t0(i,j,k) >= 100. + 273. .and. Qtmp(i,j,k) < QVapor)then
+                        if(tn(i,j,k) >= 100. + 273. .and. Qtmp(i,j,k) < QVapor)then
                             if(energyIncrease > 0.d0)then
                                 Qtmp(i,j,k) = min(Qtmp(i,j,k) + energyIncrease, Qvapor)
-                                t0(i,j,k) = 100.d0 + 273.d0
+                                tn(i,j,k) = 100.d0 + 273.d0
+                                tn(i,j,k) = 100.d0 + 273.d0
                             else
-                                t0(i,j,k) =  t0(i,j,k) + tempIncrease + laserOn*coeff(i,j,k)*jtmp(i,j,k)
+                                tn(i,j,k) =  tn(i,j,k) + tempIncrease + laserOn*coeff(i,j,k)*jtmp(i,j,k)
                             end if
                         else
-                            t0(i,j,k) =  t0(i,j,k) + tempIncrease + laserOn*coeff(i,j,k)*jtmp(i,j,k)
+                            tn(i,j,k) =  tn(i,j,k) + tempIncrease + laserOn*coeff(i,j,k)*jtmp(i,j,k)
                             !check result is physical
-                            if(t0(i,j,k) < 0.d0)then
+                            if(temp(i,j,k) < 0.d0)then
                                 print*,id,i,j,k,t0(i,j,k),loops_left
                                 call mpi_abort(new_comm, 1)
                             end if
@@ -199,7 +185,7 @@ subroutine heat_sim_3D(jmean, temp, numpoints, id, numproc, new_comm, right, lef
                     end do
                 end do
             end do
-
+            t0 = tn
             !halo swap
             !send_recv data to right
             mpi_calls = mpi_calls + 1
@@ -209,7 +195,6 @@ subroutine heat_sim_3D(jmean, temp, numpoints, id, numproc, new_comm, right, lef
             
             !send_recv data to left
             mpi_calls = mpi_calls + 1
-
             call MPI_Sendrecv(t0(:,:,zi), size(t0(:,:,zi)), mpi_double_precision, left, tag, &
                               t0(:,:,zi-1), size(t0(:,:,zi-1)), mpi_double_precision, left, tag, &
                               new_comm, recv_status)
@@ -233,17 +218,17 @@ subroutine heat_sim_3D(jmean, temp, numpoints, id, numproc, new_comm, right, lef
         end do
 
         !collate results
-                mpi_calls = mpi_calls + 1
+        mpi_calls = mpi_calls + 1
         call mpi_allgather(t0(:,:,zi:zf), size(t0(:,:,zi:zf)), mpi_double_precision, &
                         temp(:,:,zi:zf), size(temp(:,:,zi:zf)), mpi_double_precision, new_comm)
 
         mpi_calls = mpi_calls + 1
-
         call mpi_allgather(Qtmp(:,:,zi:zf), size(Qtmp(:,:,zi:zf)), mpi_double_precision, &
                         Q(:,:,zi:zf), size(Q(:,:,zi:zf)), mpi_double_precision, new_comm)
 
 
         deallocate(T0)
+        deallocate(Tn)
         deallocate(jtmp)
         deallocate(Qtmp)
 
@@ -307,8 +292,6 @@ subroutine heat_sim_3D(jmean, temp, numpoints, id, numproc, new_comm, right, lef
         pulseLength = (energyPerPixel * 1.d-3 * real(spotsPerRow* spotsPerCol)) / Power!pulselength above avg pwr
         realPulseLength = 2.d0 * pulseLength !total pulse length
 
-
-
         volumeVoxel = (2.d0*xmax*1.d-2/nxg) * (2.d0*ymax*1.d-2/nyg) * (2.d0*zmax*1.d-2/nzg)
         massVoxel = densitytmp*volumeVoxel
         QVapor = lw * massVoxel
@@ -349,6 +332,9 @@ subroutine heat_sim_3D(jmean, temp, numpoints, id, numproc, new_comm, right, lef
 
                         kappa(i,j,k) = getSkinThermalCond(WaterContent(i,j,k), density(i,j,k))
                         coeff(i,j,k) = delt/ (density(i,j,k) * heatcap(i,j,k))
+                    end if
+                    if(k-1 > 1)then
+                        if(rhokap(i,j,k-1) == 0.d0)rhokap(i,j,k)=0.d0
                     end if
                     if(rhokap(i,j,k) <= 0.01)then
                         density(i,j,k) = airDensity(temp(i,j,k))
@@ -420,12 +406,12 @@ subroutine heat_sim_3D(jmean, temp, numpoints, id, numproc, new_comm, right, lef
         do z = zi, zf
             do y = 1, numpoints
                 do x = 1, numpoints
-                    if(temp(x,y,z) >= 43.+273. .and. rhokap(x,y,z) >= mua*.25d0)then
+                    if(temp(x,y,z) >= 43.+273. .and. temp(x,y,z) < 100d0+273d0 .and. rhokap(x,y,z) >= mua*.25d0)then
                         tissue(x,y,z) = tissue(x,y,z) + delt*A*exp(-dE/(R*temp(x,y,z)))
                     end if
-                    if(Threstime(x,y,z,1) == 0.d0 .and. tissue(x,y,z) >= first)then
+                    if(Threstime(x,y,z,1) == 0.d0 .and. tissue(x,y,z) >= first .and. tissue(x,y,z) < second)then
                         Threstime(x,y,z,1) = time
-                    elseif(Threstime(x,y,z,2) == 0.d0 .and. tissue(x,y,z) >= second)then
+                    elseif(Threstime(x,y,z,2) == 0.d0 .and. tissue(x,y,z) >= second .and. tissue(x,y,z) < third)then
                         Threstime(x,y,z,2) = time
                     elseif(Threstime(x,y,z,3) == 0.d0 .and. tissue(x,y,z) >= third)then
                         Threstime(x,y,z,3) = time

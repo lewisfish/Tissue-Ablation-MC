@@ -55,27 +55,28 @@ module writer_mod
          write(u)tissueGlobal
          close(u)
 
-         ! open(newunit=u,file=trim(fileplace)//"/time-1-"//str(int(power))//"w-"&
-         !                      //str(nzg)//"-"//str(ablateTemp,3)//"-"//str(int(energyPerPixel),3)//"-"&
-         !                      //str(xmax,5)//"-"//str(ymax,5)//"-"//str(zmax,5)//".dat" &
-         !  ,access="stream",form="unformatted", status="replace")
-         ! write(u)time(:,:,:,1)
-         ! close(u)
+         open(newunit=u,file=trim(fileplace)//"/time-1-"//str(int(power))//"w-"&
+                              //str(nzg)//"-"//str(ablateTemp,3)//"-"//str(int(energyPerPixel),3)//"-"&
+                              //str(xmax,5)//"-"//str(ymax,5)//"-"//str(zmax,5)//".dat" &
+          ,access="stream",form="unformatted", status="replace")
+         write(u)time(:,:,:,1)
+         close(u)
 
 
-         ! open(newunit=u,file="trim(fileplace)//"time-2-"//str(int(power))//"w-"&
-         !                      //str(nzg)//"-"//str(ablateTemp,3)//"-"//str(int(energyPerPixel),3)//"-"&
-         !                      //str(xmax,5)//"-"//str(ymax,5)//"-"//str(zmax,5)//".dat" &
-         !  ,access="stream",form="unformatted", status="replace")
-         ! write(u)time(:,:,:,2)
-         ! close(u)
+
+         open(newunit=u,file=trim(fileplace)//"/time-2-"//str(int(power))//"w-"&
+                              //str(nzg)//"-"//str(ablateTemp,3)//"-"//str(int(energyPerPixel),3)//"-"&
+                              //str(xmax,5)//"-"//str(ymax,5)//"-"//str(zmax,5)//".dat" &
+          ,access="stream",form="unformatted", status="replace")
+         write(u)time(:,:,:,2)
+         close(u)
 
 
-         ! open(newunit=u,file=trim(fileplace)//"/time-3-"//str(int(power))//"w-"&
-         !                      //str(nzg)//"-"//str(ablateTemp,3)//"-"//str(int(energyPerPixel),3)//"-"&
-         !                      //str(xmax,5)//"-"//str(ymax,5)//"-"//str(zmax,5)//".dat" &
-         !  ,access="stream",form="unformatted", status="replace")
-         ! write(u)time(:,:,:,2)
-         ! close(u)
+         open(newunit=u,file=trim(fileplace)//"/time-3-"//str(int(power))//"w-"&
+                              //str(nzg)//"-"//str(ablateTemp,3)//"-"//str(int(energyPerPixel),3)//"-"&
+                              //str(xmax,5)//"-"//str(ymax,5)//"-"//str(zmax,5)//".dat" &
+          ,access="stream",form="unformatted", status="replace")
+         write(u)time(:,:,:,3)
+         close(u)
       end subroutine writer
 end module writer_mod

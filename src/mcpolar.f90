@@ -60,9 +60,6 @@ call alloc_array(numproc, id)
 call zarray
 
 N = nzg ! points for heat sim
-! allocate(tissue(nxg, nyg, nzg))
-! allocate(temp(0:N+1, 0:N+1, 0:N+1))
-! allocate(ThresTime(nxg, nyg, nzg, 3))
 
 tissue = 0.d0
 ThresTime = 0.d0!
@@ -134,9 +131,9 @@ call initThermalCoeff(delt, N, xmax, ymax, zmax, numproc)
 
 
 !override total_time if set too low for laser to finish 1 pulse
-! if(int(total_time/delt) <= int(realpulseLength/delt))then
-!    total_time = delt * (realpulselength/delt + 2000.)
-! end if
+if(int(total_time/delt) <= int(realpulseLength/delt))then
+   total_time = delt * (realpulselength/delt + 2000.)
+end if
 
 if(id == 0)print*,energyPerPixel,int(total_time/delt),realpulselength,delt,int(realpulselength/delt),total_time
 
