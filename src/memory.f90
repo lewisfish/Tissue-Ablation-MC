@@ -320,7 +320,6 @@ end module memoryModule
 
 ! program test
 
-!     use memoryModule
 !     use iso_fortran_env, only : int64
 
 !     implicit none
