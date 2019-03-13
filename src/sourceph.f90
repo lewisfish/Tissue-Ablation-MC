@@ -31,28 +31,28 @@ module sourceph_mod
             spotGapCol  = (gridHeight - (spotsPercol * spotSize/2.)) / (spotsPerCol) 
 
             !centre pixels
-            adjustFactorRow = abs((nint(spotsPerRow/2.) * spotGapRow) - xmax)
-            adjustFactorCol = abs((nint(spotsPerCol/2.) * spotGapcol) - ymax)
+            ! adjustFactorRow = abs((nint(spotsPerRow/2.) * spotGapRow) - xmax)
+            ! adjustFactorCol = abs((nint(spotsPerCol/2.) * spotGapcol) - ymax)
 
             !get random integer between 1 and spotsPer
-            ranx = 4!int(ran2(iseed) * real(spotsPerRow)) + 1
-            rany = 4!int(ran2(iseed) * real(spotsPerCol)) + 1
+            ! ranx = 4!int(ran2(iseed) * real(spotsPerRow)) + 1
+            ! rany = 4!int(ran2(iseed) * real(spotsPerCol)) + 1
 
             !get centre of spot
-            x = (ranx * spotGapRow) + (spotSize/2.)   
-            y = (rany * spotGapCol) + (spotSize/2.)
-            cenx = x - xmax + adjustFactorRow
-            ceny = y - ymax + adjustFactorCol
+            ! x = (ranx * spotGapRow) + (spotSize/2.)   
+            ! y = (rany * spotGapCol) + (spotSize/2.)
+            ! cenx = x - xmax + adjustFactorRow
+            ! ceny = y - ymax + adjustFactorCol
 
             !http://mathworld.wolfram.com/DiskPointPicking.html
             !sample circle uniformly
             !sample radius between [0,r^2]
-            ! r = ran2(iseed) * (spotSize/2.)**2
-            ! theta = ran2(iseed) * twopi
-            ! x = sqrt(r) * cos(theta)
-            ! y = sqrt(r) * sin(theta)
-            x = rang(0.d0, spotsize/4.d0, iseed)
-            y = rang(0.d0, spotsize/4.d0, iseed)
+            r = ran2(iseed) * (spotSize/2.)**2
+            theta = ran2(iseed) * twopi
+            x = sqrt(r) * cos(theta)
+            y = sqrt(r) * sin(theta)
+            ! x = rang(0.d0, spotsize/4.d0, iseed)
+            ! y = rang(0.d0, spotsize/4.d0, iseed)
 
             ! x = ranu(-spotSize/2.d0, spotSize/2.d0, iseed)
             ! y = ranu(-spotSize/2.d0, spotSize/2.d0, iseed)

@@ -20,42 +20,42 @@ module writer_mod
          integer :: u
 
 
-         open(newunit=u,file=trim(fileplace)//"jmean-"//str(int(power))//"w-"&
+         open(newunit=u,file=trim(fileplace)//"jmean-t"//str(int(power))//"w-"&
                               //str(nzg)//"-"//str(ablateTemp,3)//"-"//str(int(energyPerPixel),3)//"-"&
                               //str(xmax,5)//"-"//str(ymax,5)//"-"//str(zmax,5)//".dat" &
           ,access="stream",form="unformatted", status="replace")
          write(u)jmeanGLOBAL
          close(u)
 
-         open(newunit=u,file=trim(fileplace)//"rhokap-"//str(int(power))//"w-"&
+         open(newunit=u,file=trim(fileplace)//"rhokap-t"//str(int(power))//"w-"&
                               //str(nzg)//"-"//str(ablateTemp,3)//"-"//str(int(energyPerPixel),3)//"-"&
                               //str(xmax,5)//"-"//str(ymax,5)//"-"//str(zmax,5)//".dat" &
           ,access="stream",form="unformatted", status="replace")
          write(u)rhokap(1:nxg, 1:nyg, 1:nzg)
          close(u)
 
-         open(newunit=u,file=trim(fileplace)//"temp-"//str(int(power))//"w-"&
+         open(newunit=u,file=trim(fileplace)//"temp-t"//str(int(power))//"w-"&
                               //str(nzg)//"-"//str(ablateTemp,3)//"-"//str(int(energyPerPixel),3)//"-"&
                               //str(xmax,5)//"-"//str(ymax,5)//"-"//str(zmax,5)//".dat" &
           ,access="stream",form="unformatted", status="replace")
          write(u)temp - 273.d0
          close(u)
 
-         open(newunit=u,file=trim(fileplace)//"water-"//str(int(power))//"w-"&
+         open(newunit=u,file=trim(fileplace)//"water-t"//str(int(power))//"w-"&
                               //str(nzg)//"-"//str(ablateTemp,3)//"-"//str(int(energyPerPixel),3)//"-"&
                               //str(xmax,5)//"-"//str(ymax,5)//"-"//str(zmax,5)//".dat" &
           ,access="stream",form="unformatted", status="replace")
          write(u)watercontent
          close(u)
 
-         open(newunit=u,file=trim(fileplace)//"tissue-"//str(int(power))//"w-"&
+         open(newunit=u,file=trim(fileplace)//"tissue-t"//str(int(power))//"w-"&
                               //str(nzg)//"-"//str(ablateTemp,3)//"-"//str(int(energyPerPixel),3)//"-"&
                               //str(xmax,5)//"-"//str(ymax,5)//"-"//str(zmax,5)//".dat" &
           ,access="stream",form="unformatted", status="replace")
          write(u)tissueGlobal
          close(u)
 
-         open(newunit=u,file=trim(fileplace)//"/time-1-"//str(int(power))//"w-"&
+         open(newunit=u,file=trim(fileplace)//"/time-t-1-"//str(int(power))//"w-"&
                               //str(nzg)//"-"//str(ablateTemp,3)//"-"//str(int(energyPerPixel),3)//"-"&
                               //str(xmax,5)//"-"//str(ymax,5)//"-"//str(zmax,5)//".dat" &
           ,access="stream",form="unformatted", status="replace")
@@ -64,7 +64,7 @@ module writer_mod
 
 
 
-         open(newunit=u,file=trim(fileplace)//"/time-2-"//str(int(power))//"w-"&
+         open(newunit=u,file=trim(fileplace)//"/time-t-2-"//str(int(power))//"w-"&
                               //str(nzg)//"-"//str(ablateTemp,3)//"-"//str(int(energyPerPixel),3)//"-"&
                               //str(xmax,5)//"-"//str(ymax,5)//"-"//str(zmax,5)//".dat" &
           ,access="stream",form="unformatted", status="replace")
@@ -72,7 +72,7 @@ module writer_mod
          close(u)
 
 
-         open(newunit=u,file=trim(fileplace)//"/time-3-"//str(int(power))//"w-"&
+         open(newunit=u,file=trim(fileplace)//"/time-t-3-"//str(int(power))//"w-"&
                               //str(nzg)//"-"//str(ablateTemp,3)//"-"//str(int(energyPerPixel),3)//"-"&
                               //str(xmax,5)//"-"//str(ymax,5)//"-"//str(zmax,5)//".dat" &
           ,access="stream",form="unformatted", status="replace")

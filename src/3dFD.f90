@@ -384,7 +384,7 @@ subroutine heat_sim_3D(jmean, temp, numpoints, id, numproc, new_comm, right, lef
     ! calculate tisue damage
 
         use iarray,   only : rhokap
-        use opt_prop, only : mua
+        use opt_prop,  only : mua, mu_protein
 
         implicit none
 
@@ -392,11 +392,13 @@ subroutine heat_sim_3D(jmean, temp, numpoints, id, numproc, new_comm, right, lef
         real,    intent(IN)    :: temp(0:numpoints+1,0:numpoints+1,0:numpoints+1), delt
         real,    intent(INOUT) :: tissue(:,:,:), Threstime(:,:,:,:)
 
-        double precision :: A, dE, R, first, second, third
+        double precision :: A43, dE43, A55, dE55, R, first, second, third
         integer          :: x,y,z
 
-        A  = 3.1d98
-        dE = 6.27d5
+        A43  = 3.1d98
+        dE43 = 6.27d5
+        A55 = 1.606d45
+        dE55 = 3.06d5
         R  = 8.314d0
 
         first = .53d0
@@ -406,8 +408,12 @@ subroutine heat_sim_3D(jmean, temp, numpoints, id, numproc, new_comm, right, lef
         do z = zi, zf
             do y = 1, numpoints
                 do x = 1, numpoints
-                    if(temp(x,y,z) >= 43.+273. .and. temp(x,y,z) < 100d0+273d0 .and. rhokap(x,y,z) >= mua*.25d0)then
-                        tissue(x,y,z) = tissue(x,y,z) + delt*A*exp(-dE/(R*temp(x,y,z)))
+                    if(temp(x,y,z) >= 43.+273. .and. temp(x,y,z) < 100d0+273d0 .and. rhokap(x,y,z) >= mu_protein)then
+                        if(temp(x,y,z) > 55. + 273.)then
+                            tissue(x,y,z) = tissue(x,y,z) + delt*A55*exp(-dE55/(R*temp(x,y,z)))
+                        else
+                            tissue(x,y,z) = tissue(x,y,z) + delt*A43*exp(-dE43/(R*temp(x,y,z)))
+                        end if
                     end if
                     if(Threstime(x,y,z,1) == 0.d0 .and. tissue(x,y,z) >= first .and. tissue(x,y,z) < second)then
                         Threstime(x,y,z,1) = time
