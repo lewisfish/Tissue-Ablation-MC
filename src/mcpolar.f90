@@ -91,6 +91,7 @@ open(newunit=u,file=trim(resdir)//'input.params',status='old')
    read(u,*) energyPerPixel
    read(u,*) ablateTemp
    read(u,*) pulsesToDo
+   read(u, *) pulsetype
    close(u)
 
 ! set seed for rnd generator. id to change seed for each process
@@ -135,7 +136,11 @@ if(int(total_time/delt) <= int(realpulseLength/delt))then
    total_time = delt * (realpulselength/delt + 2000.)
 end if
 
-if(id == 0)print*,energyPerPixel,int(total_time/delt),realpulselength,delt,int(realpulselength/delt),total_time
+if(id == 0)then
+   print*,"Energy,      total loops,  realpulse length,    delt,            laser on,   total sim time"
+   print'(F8.1,1x,I10.5,9x,F5.3,16x,E11.5,1x,I10.5,5x,F7.3)',energyPerPixel,int(total_time/delt),realpulselength,delt,&
+                                                            int(realpulselength/delt),total_time
+end if
 
 do while(time <= total_time)
    if(laser_flag)then
