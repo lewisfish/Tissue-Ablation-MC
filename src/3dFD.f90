@@ -170,7 +170,6 @@ subroutine heat_sim_3D(jmean, temp, numpoints, id, numproc, new_comm, right, lef
                             if(energyIncrease > 0.d0)then
                                 Qtmp(i,j,k) = min(Qtmp(i,j,k) + energyIncrease, Qvapor)
                                 tn(i,j,k) = 100.d0 + 273.d0
-                                tn(i,j,k) = 100.d0 + 273.d0
                             else
                                 tn(i,j,k) =  tn(i,j,k) + tempIncrease + laserOn*coeff(i,j,k)*jtmp(i,j,k)
                             end if
@@ -314,7 +313,7 @@ subroutine heat_sim_3D(jmean, temp, numpoints, id, numproc, new_comm, right, lef
         real,    intent(IN)    :: ablateTemp
 
         integer :: i, j, k
-
+        real :: summ
         WaterContent = getWaterContent(Q, watercontent)
 
         do k = 1, nzg
@@ -323,7 +322,7 @@ subroutine heat_sim_3D(jmean, temp, numpoints, id, numproc, new_comm, right, lef
                     !ablate tissue
                     if(temp(i,j,k) >= ablateTemp + 273.d0)then
                         rhokap(i,j,k) = 0.d0
-                        !temp(i,j,k) = 273.d0+25.d0
+                        temp(i,j,k) = 273.d0+25.d0
                     elseif(rhokap(i,j,k) > 0.)then
                         if(temp(i,j,k) >= 273.+ablateTemp)print*,"error! ablation when no ablation should take place",rhokap(i,j,k)
                         density(i,j,k) = getSkinDensity(WaterContent(i,j,k))
@@ -333,9 +332,9 @@ subroutine heat_sim_3D(jmean, temp, numpoints, id, numproc, new_comm, right, lef
                         kappa(i,j,k) = getSkinThermalCond(WaterContent(i,j,k), density(i,j,k))
                         coeff(i,j,k) = delt/ (density(i,j,k) * heatcap(i,j,k))
                     end if
-                    if(k-1 > 1)then
-                        if(rhokap(i,j,k-1) == 0.d0)rhokap(i,j,k)=0.d0
-                    end if
+                    summ = 0.d0
+                    summ = rhokap(i,j,k+1) + rhokap(i,j+1,k) + rhokap(i+1,j,k) + rhokap(i,j,k-1) + rhokap(i,j-1,k) + rhokap(i-1,j,k)
+                    if(summ == 0.d0)rhokap(i,j,k)=0.d0
                     if(rhokap(i,j,k) <= 0.01)then
                         density(i,j,k) = airDensity(temp(i,j,k))
                         heatcap(i,j,k) = 1.006d3
@@ -397,8 +396,9 @@ subroutine heat_sim_3D(jmean, temp, numpoints, id, numproc, new_comm, right, lef
 
         A43  = 3.1d98
         dE43 = 6.27d5
-        A55 = 1.606d45
-        dE55 = 3.06d5
+
+        A55 = 3.1d98!1.606d45
+        dE55 = 6.3d5!3.06d5
         R  = 8.314d0
 
         first = .53d0
@@ -408,16 +408,16 @@ subroutine heat_sim_3D(jmean, temp, numpoints, id, numproc, new_comm, right, lef
         do z = zi, zf
             do y = 1, numpoints
                 do x = 1, numpoints
-                    if(temp(x,y,z) >= 43.+273. .and. temp(x,y,z) < 100d0+273d0 .and. rhokap(x,y,z) >= mu_protein)then
-                        if(temp(x,y,z) > 55. + 273.)then
+                    if(temp(x,y,z) >= 43.+273. .and. temp(x,y,z) < 100d0+273d0 .and. rhokap(x,y,z) >= 0.)then
+                        ! if(temp(x,y,z) > 55. + 273.)then
                             tissue(x,y,z) = tissue(x,y,z) + delt*A55*exp(-dE55/(R*temp(x,y,z)))
-                        else
-                            tissue(x,y,z) = tissue(x,y,z) + delt*A43*exp(-dE43/(R*temp(x,y,z)))
-                        end if
+                        ! else
+                        !     tissue(x,y,z) = tissue(x,y,z) + delt*A43*exp(-dE43/(R*temp(x,y,z)))
+                        ! end if
                     end if
-                    if(Threstime(x,y,z,1) == 0.d0 .and. tissue(x,y,z) >= first .and. tissue(x,y,z) < second)then
+                    if(Threstime(x,y,z,1) == 0.d0 .and. tissue(x,y,z) >= first)then
                         Threstime(x,y,z,1) = time
-                    elseif(Threstime(x,y,z,2) == 0.d0 .and. tissue(x,y,z) >= second .and. tissue(x,y,z) < third)then
+                    elseif(Threstime(x,y,z,2) == 0.d0 .and. tissue(x,y,z) >= second)then
                         Threstime(x,y,z,2) = time
                     elseif(Threstime(x,y,z,3) == 0.d0 .and. tissue(x,y,z) >= third)then
                         Threstime(x,y,z,3) = time

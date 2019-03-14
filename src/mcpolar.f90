@@ -137,7 +137,6 @@ end if
 
 if(id == 0)print*,energyPerPixel,int(total_time/delt),realpulselength,delt,int(realpulselength/delt),total_time
 
-
 do while(time <= total_time)
    if(laser_flag)then
 
