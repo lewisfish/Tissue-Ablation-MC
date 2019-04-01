@@ -282,7 +282,6 @@ subroutine heat_sim_3D(jmean, temp, numpoints, id, numproc, new_comm, right, lef
         coeff(1:nxg,1:nyg,1:nzg) = alphatmp * delt / kappatmp
 
         pulseLength = (energyPerPixel * 1.d-3 * real(spotsPerRow* spotsPerCol)) / Power!pulselength above avg pwr
-        realPulseLength = 2.d0 * pulseLength !total pulse length
 
         volumeVoxel = (2.d0*xmax*1.d-2/nxg) * (2.d0*ymax*1.d-2/nyg) * (2.d0*zmax*1.d-2/nzg)
         massVoxel = densitytmp*volumeVoxel
@@ -291,10 +290,13 @@ subroutine heat_sim_3D(jmean, temp, numpoints, id, numproc, new_comm, right, lef
         select case(trim(pulsetype))
         case ("tophat")
             getPwr => getPwrTopHat
+            realPulseLength = pulseLength !total pulse length
         case ("gaussian")
             getPwr => getPwrGaussian
+            realPulseLength = 20000.d0 * pulseLength !total pulse length
         case("triangular")
             getPwr => getPwrTriangular
+            realPulseLength = 2.d0 * pulseLength !total pulse length
         case default
             call mpi_finalize()
             error stop "no pulse type"
@@ -327,7 +329,7 @@ subroutine heat_sim_3D(jmean, temp, numpoints, id, numproc, new_comm, right, lef
                     !ablate tissue
                     if(temp(i,j,k) >= ablateTemp + 273.d0)then
                         rhokap(i,j,k) = 0.d0
-                        temp(i,j,k) = 273.d0+25.d0
+                        ! temp(i,j,k) = 273.d0+25.d0
                     elseif(rhokap(i,j,k) > 0.)then
                         if(temp(i,j,k) >= 273.+ablateTemp)print*,"error! ablation when no ablation should take place",rhokap(i,j,k)
                         density(i,j,k) = getSkinDensity(WaterContent(i,j,k))

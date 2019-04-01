@@ -32,7 +32,6 @@ real              :: xmax, ymax, zmax, delta, start, finish, ablateTemp
 type(mpi_comm)   :: comm, new_comm
 integer          :: right, left, id, numproc, dims(2), ndims, tag
 logical          :: periods(1), reorder
-character(len=3) :: gfd
 
 !start MPI
 call MPI_init()
