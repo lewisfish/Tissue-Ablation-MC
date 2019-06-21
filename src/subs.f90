@@ -37,6 +37,7 @@ implicit none
             yface = 0.
             zface = 0.
             rhokap = 0.
+            albedo = 0.
             jmeanGLOBAL = 0.
         end subroutine zarray
 
@@ -54,7 +55,7 @@ implicit none
 
             integer , intent(IN) :: numproc, id
 
-            integer(int64) :: limit, cnt, i
+            integer(int64) :: limit
             integer :: N
 
             limit = mem_free()
@@ -65,14 +66,14 @@ implicit none
             call checkallocate(yface, [nyg+1], "yface", numproc)
             call checkallocate(zface, [nzg+1], "zface", numproc)
 
-            call checkallocate(rhokap, [nxg+1, nyg+1, nzg+1], "rhokap", numproc, [0,0,0])
+            call checkallocate(rhokap, [nzg+1], "rhokap", numproc)
+            call checkallocate(albedo, [nzg], "albedo", numproc)
             call checkallocate(jmean, [nxg, nyg, nzg], "jmean", numproc)
             call checkallocate(jmeanGLOBAL, [nxg, nyg, nzg], "jmeanGlobal", numproc)
 
             call checkallocate(tissue, [nxg, nyg, nzg], "tissue", numproc)
             N = nzg ! points for heat sim
             call checkallocate(temp, [N+1, N+1, N+1], "temp", numproc, [0,0,0])
-            call checkallocate(ThresTime, [nxg, nyg, nzg, 3], "ThresTime", numproc)
 
             if(id==0)print'(A,1X,F5.2,A)','allocated:',dble(TotalMem)/dble(limit)*100.d0,' % of total RAM'
             

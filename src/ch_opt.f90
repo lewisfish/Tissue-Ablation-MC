@@ -20,7 +20,7 @@ CONTAINS
    mus = 0.!. / (1. - hgg)
 
    kappa  = mus + mua
-   albedo = mus / kappa
+   ! albedo = mus / kappa
 
    end subroutine init_opt1
    
@@ -38,7 +38,7 @@ CONTAINS
    mus = 180.65 !/ (1. - hgg)
 
    kappa  = mus + mua !+ 5.3e-3
-   albedo = mus / kappa
+   ! albedo = mus / kappa
 
    end subroutine init_opt2
    
@@ -50,31 +50,31 @@ CONTAINS
 
    implicit none
 
-   hgg = 0.9
+   hgg = 0.89
    g2  = hgg**2.
-   mua = .13
-   mus = 9.49 / (1. - hgg) !from s.jacques paper formula using jacques 1996 data
+   mua = .51
+   mus = 28.7 / (1. - hgg) !from s.jacques paper formula using jacques 1996 data
 
    kappa  = mus + mua !+ 5.3e-3
-   albedo = mus / kappa
+   ! albedo = mus / kappa
 
    end subroutine init_opt3
    
    subroutine init_opt4
 !
-!  subroutine to set tissue optical properties 808nm
+!  subroutine to set tissue optical properties 532nm
 !
    use opt_prop
    
    implicit none
 
-   hgg = 0.7
+   hgg = 0.75
    g2  = hgg**2.
-   mua = .23
-   mus = 21. / (1. - hgg)
+   mua = 5.42d0
+   mus = 64.3 / (1. - hgg)
 
    kappa  = mus + mua 
-   albedo = mus / kappa
+   ! albedo = mus / kappa
 
    end subroutine init_opt4
 

@@ -58,7 +58,7 @@ module thermalConstants
 
             real, intent(IN) :: waterContent
 
-            getSkinDensity = 1000.d0 / (waterContent + 0.649d0*proteinContent) !new function with protein
+            getSkinDensity = 3200.d0!1000.d0 / (waterContent + 0.649d0*proteinContent) !new function with protein
             !getSkinDensity = 1.d0 / (6.16d-5 * waterContent + 9.38d-4) !! linear function
             ! getSkinDensity = 1070d0 / (1 + exp(10*(waterContent - 0.5)))**(1.d0/74.d0) !!logistic funtion
             ! getSkinDensity = 3.489 * exp(-6.d0 * (waterContent - .5)) + 1000.d0 !!exponetial function
@@ -73,7 +73,7 @@ module thermalConstants
 
             real, intent(IN) :: waterContent
 
-            getSkinHeatCap = 1000.d0*(4.2*waterContent + 1.09d0*proteinContent) !new function with protein
+            getSkinHeatCap = 1120.d0!1000.d0*(4.2*waterContent + 1.09d0*proteinContent) !new function with protein
             !getSkinHeatCap = 2.5d3 * waterContent + 1.7d3
 
         end function getSkinHeatCap

@@ -15,9 +15,9 @@ use sourceph_mod
 use inttau2
 use ch_opt
 use writer_mod
+use stokes_mod
 use Heat, only : power, delt, energyPerPixel, laser_flag, laserOn, loops, pulseCount, pulsesToDo,pulseFlag,getPWr,&
-                 repetitionCount, repetitionRate_1, time, total_time, initThermalCoeff, heat_sim_3d,setupThermalCoeff, arrhenius&
-                 ,realpulseLength
+                 repetitionCount, repetitionRate_1, time, total_time, initThermalCoeff, heat_sim_3d,realpulseLength
 use utils
 use memoryModule, only : checkallocate
 
@@ -26,7 +26,7 @@ implicit none
 integer           :: nphotons ,iseed, j, xcell, ycell, zcell, N, counter, u, q, w, e
 logical           :: tflag
 double precision  :: nscatt
-real              :: xmax, ymax, zmax, delta, start, finish, ablateTemp
+real              :: xmax, ymax, zmax, delta, start, finish, ablateTemp, ran, ran2
 
 ! mpi variables
 type(mpi_comm)   :: comm, new_comm
@@ -61,7 +61,6 @@ call zarray
 N = nzg ! points for heat sim
 
 tissue = 0.d0
-ThresTime = 0.d0!
 
 time            = 0.
 pulseCount      = 0.
@@ -98,7 +97,7 @@ iseed = -95648324 + id
 iseed = -abs(iseed)  ! Random number seed must be negative for ran2
 
 
-call init_opt1
+! call init_opt4
 
 if(id == 0)then
    print*, ''      
@@ -120,24 +119,15 @@ call cpu_time(start)
 print*,'Photons now running on core: ',id
 
 
-temp          = 5.d0 + 273.d0
-temp(N+1,:,:) = 5.+273.  ! side face
-temp(0,:,:)   = 5.+273.    ! side face
-temp(:,0,:)   = 5.+273. ! front face
-temp(:,N+1,:) = 5.+273.  ! back face
-temp(:,:,0)   = 25.+273.  ! bottom face
-temp(:,:,N+1) = 25.+273.  ! top face 
+temp          = 37.d0 + 273.d0
+temp(N+1,:,:) = 37.+273.  ! side face
+temp(0,:,:)   = 37.+273.    ! side face
+temp(:,0,:)   = 37.+273. ! front face
+temp(:,N+1,:) = 37.+273.  ! back face
+temp(:,:,0)   = 37.+273.  ! bottom face
+temp(:,:,N+1) = 37.+273.  ! top face 
 call initThermalCoeff(delt, N, xmax, ymax, zmax, numproc)
 
-
-!override total_time if set too low for laser to finish 1 pulse
-if(trim(pulsetype) == "gaussian")then
-    !gives total time as a gaussian pulse with max as half total time
-    total_time = 2. * pulseLength * (2. * sqrt(2. * log(2.)))
-    realpulselength = total_time
-elseif(int(total_time/delt) <= int(realpulseLength/delt))then
-   total_time = delt * (realpulselength/delt + 2000.)
-end if
 
 if(id == 0)then
    print*,"Energy,      total loops,  realpulse length,    delt,            laser on,   total sim time"
@@ -149,12 +139,7 @@ do while(time <= total_time)
    if(laser_flag)then
 
       do j = 1, nphotons
-
          tflag=.FALSE.
-
-         ! if(mod(j,1000000) == 0)then
-         !    print *, str(j)//' scattered photons completed on core: '//str(id)
-         ! end if
           
       !***** Release photon *******************************
          call sourcephCO2(xmax,ymax,zmax,xcell,ycell,zcell,iseed)
@@ -164,8 +149,17 @@ do while(time <= total_time)
             
       !******** Photon scatters in grid until it exits (tflag=TRUE) 
          do while(tflag.eqv..FALSE.)
-            tflag = .true.
-            exit
+            ran = ran2(iseed)
+            
+            if(ran < albedo(zcell))then!interacts with tissue
+               call stokes(iseed)
+               nscatt = nscatt + 1
+            else
+               tflag = .true.
+               exit
+            end if
+      !************ Find next scattering location
+            call tauint1(xmax,ymax,zmax,xcell,ycell,zcell,tflag,iseed,delta)          
          end do
       end do      ! end loop over j photons
 
@@ -177,32 +171,14 @@ do while(time <= total_time)
    !do heat simulation
    call heat_sim_3d(jmeanGLOBAL, temp, N, id, numproc, new_comm, right, left, counter)
 
-   call arrhenius(temp, delt, tissue, ThresTime, 1, N, N)
-   !update thermal/optical properties
-   call setupThermalCoeff(temp, N, ablateTemp)
-
    counter = counter + 1
    jmean = 0.
+   if(id == 0)print*,counter
 end do
    
-   call checkallocate(ThresTimeGLOBAL, [nxg, nyg, nzg, 3], "ThresTimeGLOBAL", numproc)
-   ThresTimeGLOBAL = 0.d0
-   call MPI_REDUCE(ThresTime, ThresTimeGLOBAL, nxg*nyg*nzg*3, MPI_DOUBLE_PRECISION, mpi_min, 0, new_comm)
-
    !write out results
    if(id == 0)then
-      !delete damage info about ablation crater
-      !as no tissue left to damage!
-      do q = 1, nxg
-         do w = 1, nyg
-            do e = 1, nzg
-               if(rhokap(q,w,e) <= 0.1)then
-                  tissue(q,w,e) = -1.d0
-               end if
-            end do
-         end do
-      end do
-      call writer(ablateTemp, temp, tissue, xmax, ymax, zmax, ThresTimeGlobal)
+      call writer(ablateTemp, temp, tissue, xmax, ymax, zmax)
    end if
 
 call cpu_time(finish)

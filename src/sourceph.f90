@@ -19,48 +19,20 @@ module sourceph_mod
             real,    intent(IN)    :: xmax, ymax, zmax
             real                   :: ran2
 
-            real :: spotSize, gridWidth, gridHeight, spotGapCol, spotGapRow, x, y, adjustFactorRow, adjustFactorCol, ranx, rany
-            real ::  cenx, ceny, theta, r
-            integer :: spotsTotal
+            real :: spotSize, theta, r
 
-            gridWidth   = 2. * xmax!cm
-            gridHeight   = 2. * ymax!cm
-            spotsTotal  = spotsPerRow * spotsPerCol
-            spotSize    = 250d-4 !um
-            spotGapRow  = (gridWidth - (spotsPerRow * spotSize/2.)) / (spotsPerRow)
-            spotGapCol  = (gridHeight - (spotsPercol * spotSize/2.)) / (spotsPerCol) 
-
-            !centre pixels
-            ! adjustFactorRow = abs((nint(spotsPerRow/2.) * spotGapRow) - xmax)
-            ! adjustFactorCol = abs((nint(spotsPerCol/2.) * spotGapcol) - ymax)
-
-            !get random integer between 1 and spotsPer
-            ! ranx = 4!int(ran2(iseed) * real(spotsPerRow)) + 1
-            ! rany = 4!int(ran2(iseed) * real(spotsPerCol)) + 1
-
-            !get centre of spot
-            ! x = (ranx * spotGapRow) + (spotSize/2.)   
-            ! y = (rany * spotGapCol) + (spotSize/2.)
-            ! cenx = x - xmax + adjustFactorRow
-            ! ceny = y - ymax + adjustFactorCol
+            spotSize    = 0.3d0!cm
 
             !http://mathworld.wolfram.com/DiskPointPicking.html
             !sample circle uniformly
             !sample radius between [0,r^2]
             r = ran2(iseed) * (spotSize/2.)**2
             theta = ran2(iseed) * twopi
-            x = sqrt(r) * cos(theta)
-            y = sqrt(r) * sin(theta)
-            ! x = rang(0.d0, spotsize/4.d0, iseed)
-            ! y = rang(0.d0, spotsize/4.d0, iseed)
-
-            ! x = ranu(-spotSize/2.d0, spotSize/2.d0, iseed)
-            ! y = ranu(-spotSize/2.d0, spotSize/2.d0, iseed)
+            xp = sqrt(r) * cos(theta)
+            yp = sqrt(r) * sin(theta)
 
 
             !get final point
-            xp = x !- cenx
-            yp = y !- ceny
             zp = zmax-(1.e-8*(2.*zmax/nzg))
 
             phi = twopi * ran2(iseed)

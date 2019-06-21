@@ -6,9 +6,8 @@ MODULE iarray
     save
 
     real, allocatable :: xface(:),yface(:),zface(:)
-    real, allocatable :: rhokap(:,:,:)
+    real, allocatable :: rhokap(:), albedo(:)
     real, allocatable :: jmean(:,:,:),jmeanGLOBAL(:,:,:)
     real, allocatable :: temp(:,:,:), tissue(:,:,:)
-    real, allocatable :: ThresTime(:,:,:,:), ThresTimeGLOBAL(:,:,:,:)
 
 end MODULE iarray

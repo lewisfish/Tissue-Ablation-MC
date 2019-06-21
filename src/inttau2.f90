@@ -37,20 +37,20 @@ CONTAINS
       do
          dir = (/.FALSE., .FALSE., .FALSE./)
          dcell = wall_dist(celli, cellj, cellk, xcur, ycur, zcur, dir)
-         taucell = dcell * rhokap(celli,cellj,cellk)
+         taucell = dcell * rhokap(cellk)
 
          if(taurun + taucell < tau)then
             taurun = taurun + taucell
             d = d + dcell
             !photon absoption estimator
-            jmean(celli, cellj, cellk) = jmean(celli, cellj, cellk) + dcell*rhokap(celli,cellj,cellk)
+            jmean(celli, cellj, cellk) = jmean(celli, cellj, cellk) + dcell*rhokap(cellk)
 
             call update_pos(xcur, ycur, zcur, celli, cellj, cellk, dcell, .TRUE., dir, delta)
          else
 
-            dcell = (tau - taurun) / rhokap(celli,cellj,cellk)
+            dcell = (tau - taurun) / rhokap(cellk)
             d = d + dcell
-            jmean(celli, cellj, cellk) = jmean(celli, cellj, cellk) + dcell*rhokap(celli,cellj,cellk)
+            jmean(celli, cellj, cellk) = jmean(celli, cellj, cellk) + dcell*rhokap(cellk)
             call update_pos(xcur, ycur, zcur, celli, cellj, cellk, dcell, .FALSE., dir, delta)
             exit
          end if
