@@ -18,4 +18,7 @@ data/
 *.dat
 *.gif
 *.synctex.gz
-
+*.py
+*.png
+*.doc
+newdata/

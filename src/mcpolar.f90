@@ -131,7 +131,11 @@ call initThermalCoeff(delt, N, xmax, ymax, zmax, numproc)
 
 
 !override total_time if set too low for laser to finish 1 pulse
-if(int(total_time/delt) <= int(realpulseLength/delt))then
+if(trim(pulsetype) == "gaussian")then
+    !gives total time as a gaussian pulse with max as half total time
+    total_time = 2. * pulseLength * (2. * sqrt(2. * log(2.)))
+    realpulselength = total_time
+elseif(int(total_time/delt) <= int(realpulseLength/delt))then
    total_time = delt * (realpulselength/delt + 2000.)
 end if
 
