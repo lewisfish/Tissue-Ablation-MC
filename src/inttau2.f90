@@ -9,7 +9,7 @@ CONTAINS
    !
    !
       use photon_vars, only : xp, yp, zp
-      use iarray,      only : jmean, rhokap     
+      use iarray,      only : jmean, rhokap, muas 
    
       implicit none
       
@@ -43,14 +43,13 @@ CONTAINS
             taurun = taurun + taucell
             d = d + dcell
             !photon absoption estimator
-            jmean(celli, cellj, cellk) = jmean(celli, cellj, cellk) + dcell*rhokap(cellk)
-
+            jmean(celli, cellj, cellk) = jmean(celli, cellj, cellk) + dcell*muas(cellk)
             call update_pos(xcur, ycur, zcur, celli, cellj, cellk, dcell, .TRUE., dir, delta)
          else
 
             dcell = (tau - taurun) / rhokap(cellk)
             d = d + dcell
-            jmean(celli, cellj, cellk) = jmean(celli, cellj, cellk) + dcell*rhokap(cellk)
+            jmean(celli, cellj, cellk) = jmean(celli, cellj, cellk) + dcell*muas(cellk)
             call update_pos(xcur, ycur, zcur, celli, cellj, cellk, dcell, .FALSE., dir, delta)
             exit
          end if

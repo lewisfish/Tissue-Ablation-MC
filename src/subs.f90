@@ -39,6 +39,10 @@ implicit none
             rhokap = 0.
             albedo = 0.
             jmeanGLOBAL = 0.
+            refrac = 0.
+            hgg = 0.
+            g2 = 0.
+            muas = 0.
         end subroutine zarray
 
 
@@ -67,6 +71,11 @@ implicit none
             call checkallocate(zface, [nzg+1], "zface", numproc)
 
             call checkallocate(rhokap, [nzg+1], "rhokap", numproc)
+            call checkallocate(refrac, [nzg+1], "refrac", numproc)
+            call checkallocate(muas, [nzg], "muas", numproc)
+            call checkallocate(g2, [nzg], "g2", numproc)
+            call checkallocate(hgg, [nzg], "hgg", numproc)
+
             call checkallocate(albedo, [nzg], "albedo", numproc)
             call checkallocate(jmean, [nxg, nyg, nzg], "jmean", numproc)
             call checkallocate(jmeanGLOBAL, [nxg, nyg, nzg], "jmeanGlobal", numproc)

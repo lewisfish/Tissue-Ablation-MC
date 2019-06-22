@@ -8,7 +8,7 @@ module sourceph_mod
         subroutine sourcephCO2(xmax,ymax,zmax,xcell,ycell,zcell,iseed)
         ! get phton entry location for C02 laser
 
-            use constants, only : nxg,nyg,nzg,twopi,spotsPerRow, spotsPerCol
+            use constants, only : nxg, nyg, nzg, twopi
             use photon_vars
 
             implicit none

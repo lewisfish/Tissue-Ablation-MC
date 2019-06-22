@@ -6,14 +6,15 @@ module gridset_mod
       subroutine gridset(xmax,ymax,zmax,id)
 
          use constants, only : nxg,nyg,nzg
-         use iarray, only    : rhokap, xface, yface, zface, rhokap, albedo
-         use opt_prop, only  : kappa
+         use iarray,    only : rhokap, xface, yface, zface, rhokap, albedo, g2, refrac, hgg, muas
+         use opt_prop,  only : hgg_epi, hgg_pap, hgg_ret, hgg_hypo, mua_epi, mua_pap, mua_ret, mua_hypo, mus_epi, mus_pap, mus_ret,&
+                               mus_hypo, n_epi, n_pap, n_ret, n_hypo
          use ch_opt
 
          implicit none
 
          integer :: i, j, k, id
-         real    :: xmax, ymax, zmax, x, y, z, mus, mua, g, n
+         real    :: xmax, ymax, zmax, x, y, z
 
          if(id == 0)then
             print*, ' '
@@ -29,7 +30,6 @@ module gridset_mod
          do i = 1, nzg+1
             zface(i) = (i-1) * 2. * zmax/nzg
          end do
-         call init_opt1
          !**************  Loop through x, y, and z to set up grid density and refractive index grid.  ****
          rhokap = 0.
          do i = 1, nxg
@@ -41,36 +41,36 @@ module gridset_mod
                   !set density 
                   if(0.1 >= 2.*zmax - z)then
                      !epi
-                     mua = 0.78!5.42d0
-                     g = 0.87!.75d0
-                     mus = 30.9 / (1. - g)!64.3 / (1. - g)
-                     n = 1.45d0
-                     rhokap(k) = mus + mua
-                     albedo(k) = mus / rhokap(k)
+                     rhokap(k) = mus_epi + mua_epi
+                     muas(k) = mua_epi
+                     albedo(k) = mus_epi / rhokap(k)
+                     refrac(k) = n_epi
+                     hgg(k) = hgg_epi
+                     g2(k) = hgg_epi**2
                   elseif(0.2 >= 2.*zmax - z)then
                      ! print*,"pap"
-                     mua = .66!3.55d0
-                     g = .72!.71d0
-                     mus = 16.6 / (1. - g)!39.7d0 / (1. - g)
-                     n = 1.39d0
-                     rhokap(k) = mus + mua
-                     albedo(k) = mus / rhokap(k)
+                     rhokap(k) = mus_pap + mua_pap
+                     muas(k) = mua_pap
+                     albedo(k) = mus_pap / rhokap(k)
+                     refrac(k) = n_pap
+                     hgg(k) = hgg_pap
+                     g2(k) = hgg_pap**2
                   elseif(0.7 >= 2.*zmax - z)then
                      ! print*,"ret"
-                     mua = 0.64!2.90d0
-                     g = .72!.71d0
-                     mus = 16.6!39.7d0 / (1. - g)
-                     n = 1.39
-                     rhokap(k) = mus + mua
-                     albedo(k) = mus / rhokap(k)
+                     rhokap(k) = mus_ret + mua_ret
+                     muas(k) = mua_ret
+                     albedo(k) = mus_ret / rhokap(k)
+                     refrac(k) = n_ret
+                     hgg(k) = hgg_ret
+                     g2(k) = hgg_ret**2
                   else
                      ! print*,"hypo"
-                     mua = .18!0.84d0
-                     g = .78!.78d0
-                     mus = 5.3/ (1. - g)!9.2d0 / (1. - g)
-                     n = 1.37d0
-                     rhokap(k) = mus + mua
-                     albedo(k) = mus / rhokap(k)
+                     rhokap(k) = mus_hypo + mua_hypo
+                     muas(k) =   mua_hypo
+                     albedo(k) = mus_hypo / rhokap(k)
+                     refrac(k) = n_hypo
+                     hgg(k) = hgg_hypo
+                     g2(k) = hgg_hypo**2
                   end if
                end do
             end do

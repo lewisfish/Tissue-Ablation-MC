@@ -7,8 +7,9 @@
 .005         total_time (s)
 1         loops (how many heat loops to do before redoing MCRT)
 10000000./1.        repetitionRate_1 (Hz)
-3.4        power (W)
-17          energyPerPixel (mJ)
+25.4        power (W)
+1          pulselength (mJ)
 1000       ablatetemp (C)
 1         pulses to do
 tophat  pulsetype
+532	wavelength (nm)

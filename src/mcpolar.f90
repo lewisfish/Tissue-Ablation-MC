@@ -23,7 +23,7 @@ use memoryModule, only : checkallocate
 
 implicit none
 
-integer           :: nphotons ,iseed, j, xcell, ycell, zcell, N, counter, u, q, w, e
+integer           :: nphotons ,iseed, j, xcell, ycell, zcell, N, counter, u
 logical           :: tflag
 double precision  :: nscatt
 real              :: xmax, ymax, zmax, delta, start, finish, ablateTemp, ran, ran2
@@ -90,14 +90,23 @@ open(newunit=u,file=trim(resdir)//'input.params',status='old')
    read(u,*) ablateTemp
    read(u,*) pulsesToDo
    read(u, *) pulsetype
+   read(u, *) wavelength
    close(u)
 
 ! set seed for rnd generator. id to change seed for each process
 iseed = -95648324 + id
 iseed = -abs(iseed)  ! Random number seed must be negative for ran2
 
-
-! call init_opt4
+select case(wavelength)
+    case(1064)
+        call init_opt3
+    case(532)
+        call init_opt1
+    case(975)
+        call init_opt2
+    case default
+        error stop
+end select
 
 if(id == 0)then
    print*, ''      
@@ -135,7 +144,6 @@ if(id == 0)then
                                                             int(realpulselength/delt),total_time
 end if
 
-do while(time <= total_time)
    if(laser_flag)then
 
       do j = 1, nphotons
@@ -152,7 +160,7 @@ do while(time <= total_time)
             ran = ran2(iseed)
             
             if(ran < albedo(zcell))then!interacts with tissue
-               call stokes(iseed)
+               call stokes(zcell, iseed)
                nscatt = nscatt + 1
             else
                tflag = .true.
@@ -165,20 +173,21 @@ do while(time <= total_time)
 
       !reduce jmean from all processess
       call MPI_allREDUCE(jmean, jmeanGLOBAL, (nxg*nyg*nzg),MPI_DOUBLE_PRECISION, MPI_SUM,new_comm)
-      jmeanGLOBAL = jmeanGLOBAL * ((getPwr()/81.d0)/(nphotons*numproc*(2.*xmax*1.d-2/nxg)*(2.*ymax*1.d-2/nyg)*(2.*zmax*1.d-2/nzg)))
+      jmeanGLOBAL = jmeanGLOBAL * ((getPwr())/(nphotons*numproc*(2.*xmax*1.d-2/nxg)*(2.*ymax*1.d-2/nyg)*(2.*zmax*1.d-2/nzg)))
    end if
+do while(time <= total_time)
 
    !do heat simulation
    call heat_sim_3d(jmeanGLOBAL, temp, N, id, numproc, new_comm, right, left, counter)
 
    counter = counter + 1
-   jmean = 0.
-   if(id == 0)print*,counter
+   ! jmean = 0.
+   ! if(id == 0)print*,counter
 end do
    
    !write out results
    if(id == 0)then
-      call writer(ablateTemp, temp, tissue, xmax, ymax, zmax)
+      call writer(temp, xmax, ymax, zmax)
    end if
 
 call cpu_time(finish)

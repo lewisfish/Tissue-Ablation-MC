@@ -3,42 +3,35 @@ MODULE ch_opt
 implicit none
 
 CONTAINS
-   
-   subroutine init_opt1
-!
-!  subroutine to set tissue optical properties 10.6um
-!
-   use opt_prop
-   
-   implicit none
-
-   hgg = 0.9
-   g2  = hgg**2.
-   mu_water = 510.d0
-   mu_protein = 170.d0
-   mua = mu_water + mu_protein! Effective infrared absorption coefficient for photothermal radiometric measurements in biological tissues
-   mus = 0.!. / (1. - hgg)
-
-   kappa  = mus + mua
-   ! albedo = mus / kappa
-
-   end subroutine init_opt1
-   
+     
    subroutine init_opt2
 !
-!  subroutine to set tissue optical properties 900nm
+!  subroutine to set tissue optical properties 975nm
 !
-   use opt_prop
-
-   implicit none
-
-   hgg = 0.9
-   g2  = hgg**2.
-   mua = .15
-   mus = 180.65 !/ (1. - hgg)
-
-   kappa  = mus + mua !+ 5.3e-3
-   ! albedo = mus / kappa
+       use opt_prop
+    
+       implicit none
+    
+    
+       hgg_epi = 0.87d0
+       hgg_pap = 0.72d0
+       hgg_ret = 0.72d0
+       hgg_hypo = 0.78d0
+    
+       mua_epi = 0.78d0
+       mua_pap = 0.66d0
+       mua_ret = 0.64d0
+       mua_hypo = 0.18d0
+    
+       mus_epi = 30.9d0 / (1.d0 - hgg_epi)
+       mus_pap = 16.6d0 / (1.d0 - hgg_pap)
+       mus_ret = 16.6d0 / (1.d0 - hgg_ret)
+       mus_hypo = 5.3d0 / (1.d0 - hgg_hypo)
+    
+       n_epi = 1.42d0
+       n_pap = 1.37d0
+       n_ret = 1.37d0
+       n_hypo = 1.37d0
 
    end subroutine init_opt2
    
@@ -46,37 +39,61 @@ CONTAINS
 !
 !  subroutine to set tissue optical properties 1064nm
 !
-   use opt_prop
+       use opt_prop
 
-   implicit none
+       implicit none
 
-   hgg = 0.89
-   g2  = hgg**2.
-   mua = .51
-   mus = 28.7 / (1. - hgg) !from s.jacques paper formula using jacques 1996 data
-
-   kappa  = mus + mua !+ 5.3e-3
-   ! albedo = mus / kappa
+       hgg_epi = 0.89d0
+       hgg_pap = 0.72d0
+       hgg_ret = 0.72d0
+       hgg_hypo = 0.78d0
+    
+       mua_epi = 0.51d0
+       mua_pap = 0.38d0
+       mua_ret = 0.38d0
+       mua_hypo = 0.08d0
+    
+       mus_epi = 28.7d0 / (1.d0 - hgg_epi)
+       mus_pap = 14.7d0 / (1.d0 - hgg_pap)
+       mus_ret = 14.7d0 / (1.d0 - hgg_ret)
+       mus_hypo = 5.0d0 / (1.d0 - hgg_hypo)
+    
+       n_epi = 1.42d0
+       n_pap = 1.37d0
+       n_ret = 1.37d0
+       n_hypo = 1.37d0
 
    end subroutine init_opt3
    
-   subroutine init_opt4
+   subroutine init_opt1
 !
 !  subroutine to set tissue optical properties 532nm
 !
-   use opt_prop
-   
-   implicit none
+       use opt_prop
+       
+       implicit none
 
-   hgg = 0.75
-   g2  = hgg**2.
-   mua = 5.42d0
-   mus = 64.3 / (1. - hgg)
+       hgg_epi = 0.75d0
+       hgg_pap = 0.71d0
+       hgg_ret = 0.71d0
+       hgg_hypo = 0.78d0
+    
+       mua_epi = 5.42d0
+       mua_pap = 3.55d0
+       mua_ret = 2.90d0
+       mua_hypo = 0.84d0
+    
+       mus_epi = 64.3d0 / (1.d0 - hgg_epi)
+       mus_pap = 39.7d0 / (1.d0 - hgg_pap)
+       mus_ret = 39.7d0 / (1.d0 - hgg_ret)
+       mus_hypo = 9.2d0 / (1.d0 - hgg_hypo)
+    
+       n_epi = 1.45d0
+       n_pap = 1.39d0
+       n_ret = 1.39d0
+       n_hypo = 1.37d0
 
-   kappa  = mus + mua 
-   ! albedo = mus / kappa
-
-   end subroutine init_opt4
+   end subroutine init_opt1
 
    subroutine sample(array, size_of, cdf, wave, iseed)
 !      

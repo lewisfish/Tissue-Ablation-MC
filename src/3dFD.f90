@@ -7,13 +7,13 @@ Module Heat
     real              :: pulseCount, repetitionCount, time, laserOn, total_time, repetitionRate_1, energyPerPixel
     real              :: Power, pulselength, delt, realPulseLength
     real              :: dx, dy, dz, massVoxel, volumeVoxel
-    real, allocatable :: coeff(:,:,:), kappa(:,:,:), density(:,:,:), heatcap(:,:,:), WaterContent(:,:,:), alpha(:,:,:)
+    real, allocatable :: coeff(:,:,:), kappa(:,:,:), density(:,:,:), heatcap(:,:,:), alpha(:,:,:)
     logical           :: laser_flag, pulseFlag
     integer           :: loops, pulsesToDo, pulsesDone, loops_left
 
     private
     public :: power, delt, energyPerPixel, laser_flag, laserOn, loops, pulseCount, pulselength, pulsesToDo, repetitionCount
-    public :: repetitionRate_1, time,total_time, initThermalCoeff, heat_sim_3d, watercontent
+    public :: repetitionRate_1, time,total_time, initThermalCoeff, heat_sim_3d
     public :: pulseFlag, realPulseLength, getPwr
 
     contains
@@ -159,7 +159,6 @@ subroutine heat_sim_3D(jmean, temp, numpoints, id, numproc, new_comm, right, lef
                         u_xx = a*t0(i-1,j,k) - 2.d0*b*t0(i,j,k) + d*t0(i+1,j,k)
 
                         tempIncrease = delt * (u_xx + u_yy + u_zz) 
-                        energyIncrease = laserOn*jtmp(i,j,k)*delt*volumeVoxel + heatcap(i,j,k)*massVoxel*tempIncrease
 
                         tn(i,j,k) =  tn(i,j,k) + tempIncrease + laserOn*coeff(i,j,k)*jtmp(i,j,k)
                         !check result is physical
@@ -236,20 +235,17 @@ subroutine heat_sim_3D(jmean, temp, numpoints, id, numproc, new_comm, right, lef
         call checkallocate(density, [nxg+1, nyg+1, nzg+1], "density", numproc, [0,0,0])
         call checkallocate(heatCap, [nxg+1, nyg+1, nzg+1], "heatcap", numproc, [0,0,0])
 
-        call checkallocate(watercontent, [nxg, nyg, nzg], "watercontent", numproc)
-
-        skinDensityInit = getSkinDensity(watercontentInit)
-        WaterContent = watercontentInit
-        heatCaptmp =  getSkinHeatCap(watercontentInit)
-        densitytmp  = getSkinDensity(watercontentInit)
-        kappatmp = getSkinThermalCond(watercontentInit, densitytmp)
-        alphatmp = kappatmp / (densitytmp * getSkinHeatCap(watercontentInit))
+        skinDensityInit = getSkinDensity()
+        heatCaptmp =  getSkinHeatCap()
+        densitytmp  = getSkinDensity()
+        kappatmp = getSkinThermalCond()
+        alphatmp = kappatmp / (densitytmp * getSkinHeatCap())
 
         alpha = alphatmp
         alpha(:,:,nzg+1) = airThermalCond(25.d0 + 273.d0, 0) / (airDensity(25.d0 + 273.d0) * airHeatCap) 
 
         kappa = airThermalCond(25.+273., 0)
-        kappa(1:nxg,1:nyg,1:nzg) = getSkinThermalCond(watercontentInit, densitytmp)
+        kappa(1:nxg,1:nyg,1:nzg) = getSkinThermalCond()
 
         density = densitytmp
         heatcap = heatcaptmp
@@ -260,11 +256,11 @@ subroutine heat_sim_3D(jmean, temp, numpoints, id, numproc, new_comm, right, lef
         coeff = 0.d0
         coeff(1:nxg,1:nyg,1:nzg) = alphatmp * delt / kappatmp
 
-        pulseLength = (energyPerPixel * 1.d-3 * real(spotsPerRow* spotsPerCol)) / Power!pulselength above avg pwr
+
+        pulseLength = energyPerPixel!pulselength 
 
         volumeVoxel = (2.d0*xmax*1.d-2/nxg) * (2.d0*ymax*1.d-2/nyg) * (2.d0*zmax*1.d-2/nzg)
         massVoxel = densitytmp*volumeVoxel
-        QVapor = lw * massVoxel
 
         select case(trim(pulsetype))
         case ("tophat")

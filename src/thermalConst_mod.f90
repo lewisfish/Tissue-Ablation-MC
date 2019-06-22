@@ -3,8 +3,7 @@ module thermalConstants
     implicit none
 
     real, parameter :: airHeatCap=1.006d3, tempAir=25.d0+273.d0, tempAir4=tempAir**4, lw=2256.d3
-    real, parameter :: waterContentInit=.75, proteinContent=1.d0-waterContentInit!%
-    real            :: skinDensityInit, QVapor
+    real            :: skinDensityInit
 
     contains
 
@@ -38,66 +37,33 @@ module thermalConstants
         end function airDensity
 
 
-        elemental real function getWaterContent(Qcurrent, watercurrent)
-
-            implicit none
-
-            real, intent(IN) :: Qcurrent, watercurrent
-
-            getWaterContent = max(min(min(waterContentInit - waterContentInit * (Qcurrent / QVapor), waterContentInit), &
-                                  watercurrent), 0.0)
-
-        end function getWaterContent
-
-
         !source for three below function: Analysis of Thermal Relaxation During LaserIrradiation of Tissue, Choi & Welch 2001
-        real function getSkinDensity(waterContent)
+        real function getSkinDensity()
         !get dsensity of skin based upon water content. In Kg m-3
 
             implicit none
 
-            real, intent(IN) :: waterContent
-
-            getSkinDensity = 3200.d0!1000.d0 / (waterContent + 0.649d0*proteinContent) !new function with protein
-            !getSkinDensity = 1.d0 / (6.16d-5 * waterContent + 9.38d-4) !! linear function
-            ! getSkinDensity = 1070d0 / (1 + exp(10*(waterContent - 0.5)))**(1.d0/74.d0) !!logistic funtion
-            ! getSkinDensity = 3.489 * exp(-6.d0 * (waterContent - .5)) + 1000.d0 !!exponetial function
+            getSkinDensity = 1120.d0
 
         end function getSkinDensity
 
 
-        real function getSkinHeatCap(waterContent)
+        real function getSkinHeatCap()
         !get heat capacity for skin. In J Kg-1 K-1 
 
             implicit none
 
-            real, intent(IN) :: waterContent
-
-            getSkinHeatCap = 1120.d0!1000.d0*(4.2*waterContent + 1.09d0*proteinContent) !new function with protein
-            !getSkinHeatCap = 2.5d3 * waterContent + 1.7d3
+            getSkinHeatCap = 3200.d0
 
         end function getSkinHeatCap
 
 
-        real function getSkinThermalCond(waterContent, currentDensity)
+        real function getSkinThermalCond()
         !get thermal conductivity for skin. In W m-1 K-1 
 
             implicit none
 
-            real, intent(IN) :: waterContent, currentDensity
-
-            getSkinThermalCond = currentDensity * (6.28d-4*waterContent + 1.17d-4*proteinContent)!new function with protein
-            !getSkinThermalCond = currentDensity*1.d-3 * (.454 * waterContent + 0.174d0)
+            getSkinThermalCond = .34d0!currentDensity * (6.28d-4*waterContent + 1.17d-4*proteinContent)!new function with protein
 
         end function getSkinThermalCond
 end module thermalConstants
-
-        !init heat variables for medium
-        ! kappa = 0.00209 !0.0056 ! W/cm K    thermal conductivity
-        ! rho = 1.07 ! g/cm^3                 density
-        ! c_heat = 3.4 !J/g K                 heat capacity
-        ! eps = 0.98
-        ! sigma = 5.670373e-8
-        ! t_air = 25.+273.
-        ! t_air4 = t_air**4
-        ! h = 10.

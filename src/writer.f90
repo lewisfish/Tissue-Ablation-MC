@@ -3,18 +3,18 @@ module writer_mod
    implicit none
 
    contains
-      subroutine writer(ablateTemp, temp, tissueGlobal, xmax, ymax, zmax)
+      subroutine writer(temp, xmax, ymax, zmax)
       !   write out arrays
       !
       !
          use constants, only : nxg, nyg, nzg, fileplace
          use iarray,    only : jmeanGLOBAL, rhokap
-         use heat,      only : energyPerPixel, power, watercontent
+         use heat,      only : energyPerPixel, power
          use utils,     only : str
 
          implicit none
 
-         real,    intent(IN) :: ablateTemp, temp(0:nxg+1,0:nyg+1,0:nzg+1), tissueGlobal(:,:,:)
+         real, intent(IN) :: temp(0:nxg+1,0:nyg+1,0:nzg+1)
          real, intent(IN) :: xmax, ymax, zmax
 
          integer :: u

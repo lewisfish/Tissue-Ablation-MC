@@ -3,30 +3,31 @@ module stokes_mod
    implicit none
 
    contains
-      subroutine stokes(iseed)
+      subroutine stokes(z, iseed)
       !   routine to calculate scattering direction
       !
       !
 
          use constants, only   : PI,TWOPI
          use photon_vars, only : nxp,nyp,nzp,cost,sint,cosp,sinp,phi
-         use opt_prop, only    : hgg,g2
+         use iarray, only    : hgg,g2
          
          implicit none
 
-         integer :: iseed
+         integer, intent(INOUT) :: iseed
+         integer, intent(IN)    :: z
          real    :: costp, sintp, phip, bmu, b, ri1, ri3, cosi3, sini3
          real    :: cosb2, sinbt, cosi2, sini1, cosi1, sini2, bott, cosdph, ran2
 
 
          !***** isotropic scattering if g = 0.0 ******************************
-         if(hgg.eq.0.0) then
-            cost=2.*ran2(iseed)-1.
-            sint=(1.-cost*cost)
-            if(sint.le.0.)then
-               sint=0.
+         if(hgg(z) == 0.0) then
+            cost = 2.*ran2(iseed)-1.
+            sint = (1.-cost*cost)
+            if(sint <= 0.)then
+               sint = 0.
             else
-               sint=sqrt(sint)
+               sint = sqrt(sint)
             endif
 
             phi=TWOPI*ran2(iseed)
@@ -45,7 +46,7 @@ module stokes_mod
             sintp=sint
             phip=phi
 
-            bmu=((1.+g2)-((1.-g2)/(1.-hgg+2.*hgg*ran2(iseed)))**2)/(2.*hgg)
+            bmu=((1.+g2(z))-((1.-g2(z))/(1.-hgg(z)+2.*hgg(z)*ran2(iseed)))**2)/(2.*hgg(z))
             cosb2=bmu**2
             b=cosb2-1.
 
