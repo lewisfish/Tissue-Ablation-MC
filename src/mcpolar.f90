@@ -17,7 +17,7 @@ use ch_opt
 use writer_mod
 use Heat, only : power, delt, energyPerPixel, laser_flag, laserOn, loops, pulseCount, pulsesToDo,pulseFlag,getPWr,&
                  repetitionCount, repetitionRate_1, time, total_time, initThermalCoeff, heat_sim_3d,setupThermalCoeff, arrhenius&
-                 ,realpulseLength
+                 ,realpulseLength, pulseLength
 use utils
 use memoryModule, only : checkallocate
 

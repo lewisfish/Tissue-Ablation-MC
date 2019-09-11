@@ -186,27 +186,6 @@ module utils
         end function str_iarray
 
 
-        ! function str_R4(i, len)
-
-        !     implicit none
-
-        !     real,              intent(IN) :: i
-        !     integer, optional, intent(IN) :: len
-
-        !     character(len=:), allocatable :: str_R4
-        !     character(len=100) :: string
-
-        !     write(string,'(f100.8)') I
-
-        !     if(present(len))then
-        !         str_R4 = trim(adjustl(string))
-        !         str_R4 = trim(adjustl(str_R4(:len)))
-        !     else
-        !         str_R4 = trim(adjustl(string))
-        !     end if
-        ! end function str_R4
-
-
         function str_R8(i, len)
 
             implicit none
@@ -314,34 +293,6 @@ module utils
                 colourised = start//fmt1//'m'//string//achar(27)//end
             end if
         end function colour_int
-
-
-        ! function colour_real4(inte, fmt1, fmt2, fmt3, fmt4, fmt5) result(colourised)
-
-        !     implicit none
-
-        !     real,                   intent(IN) :: inte
-        !     character(*), optional, intent(IN) :: fmt1, fmt2, fmt3, fmt4, fmt5
-
-        !     character(len=:), allocatable :: colourised, string
-        !     character(len=50)             :: tmp
-
-        !     write(tmp,'(F50.8)') inte
-        !     string = trim(adjustl(tmp))
-        !     colourised = trim(adjustl(string))
-
-        !     if(present(fmt1) .and. present(fmt2) .and. present(fmt3) .and. present(fmt4) .and. present(fmt5))then
-        !         colourised = start//fmt1//';'//fmt2//';'//fmt3//';'//fmt4//';'//fmt5//'m'//string//achar(27)//end
-        !     elseif(present(fmt1) .and. present(fmt2) .and. present(fmt3) .and. present(fmt4))then
-        !         colourised = start//fmt1//';'//fmt2//';'//fmt3//';'//fmt4//'m'//string//achar(27)//end
-        !     elseif(present(fmt1) .and. present(fmt2) .and. present(fmt3))then
-        !         colourised = start//fmt1//';'//fmt2//';'//fmt3//'m'//string//achar(27)//end
-        !     elseif(present(fmt1) .and. present(fmt2))then
-        !         colourised = start//fmt1//';'//fmt2//'m'//string//achar(27)//end
-        !     elseif(present(fmt1))then
-        !         colourised = start//fmt1//'m'//string//achar(27)//end
-        !     end if
-        ! end function colour_real4
 
 
         function colour_real8(inte, fmt1, fmt2, fmt3, fmt4, fmt5) result(colourised)

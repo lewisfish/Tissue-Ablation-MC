@@ -234,8 +234,8 @@ subroutine heat_sim_3D(jmean, temp, numpoints, id, numproc, new_comm, right, lef
     !init all thermal variables
 
         use thermalConstants
-        use constants, only : nxg, nyg, nzg, spotsPerRow, spotsPerCol, pulsetype
-        use memoryModule, only : checkallocate, totalMem
+        use constants,    only : nxg, nyg, nzg, spotsPerRow, spotsPerCol, pulsetype
+        use memoryModule, only : checkallocate
 
         implicit none
 
@@ -245,19 +245,21 @@ subroutine heat_sim_3D(jmean, temp, numpoints, id, numproc, new_comm, right, lef
 
         real :: densitytmp, alphatmp, kappatmp, heatCaptmp, constd
 
+        !calculate node distance for FDM 
         dx = (2.d0 * xmax * 1.d-2) / (numpoints + 2.d0)
         dy = (2.d0 * ymax * 1.d-2) / (numpoints + 2.d0)
         dz = (2.d0 * zmax * 1.d-2) / (numpoints + 2.d0)  
 
+        !safely allocate memory
         call checkallocate(coeff,   [nxg+1, nyg+1, nzg+1], "coeff",   numproc, [0,0,0])
         call checkallocate(alpha,   [nxg+1, nyg+1, nzg+1], "alpha",   numproc, [0,0,0])
         call checkallocate(kappa,   [nxg+1, nyg+1, nzg+1], "kappa",   numproc, [0,0,0])
         call checkallocate(density, [nxg+1, nyg+1, nzg+1], "density", numproc, [0,0,0])
         call checkallocate(heatCap, [nxg+1, nyg+1, nzg+1], "heatcap", numproc, [0,0,0])
-
         call checkallocate(Q, [nxg, nyg, nzg], "Q", numproc)
         call checkallocate(watercontent, [nxg, nyg, nzg], "watercontent", numproc)
 
+        !get initial thermal variables and set them into arrays
         Q = 0.d0
         skinDensityInit = getSkinDensity(watercontentInit)
         WaterContent = watercontentInit
@@ -281,12 +283,14 @@ subroutine heat_sim_3D(jmean, temp, numpoints, id, numproc, new_comm, right, lef
         coeff = 0.d0
         coeff(1:nxg,1:nyg,1:nzg) = alphatmp * delt / kappatmp
 
+        !calculate pulse length
         pulseLength = (energyPerPixel * 1.d-3 * real(spotsPerRow* spotsPerCol)) / Power!pulselength above avg pwr
 
         volumeVoxel = (2.d0*xmax*1.d-2/nxg) * (2.d0*ymax*1.d-2/nyg) * (2.d0*zmax*1.d-2/nzg)
         massVoxel = densitytmp*volumeVoxel
         QVapor = lw * massVoxel
 
+        !adjust puls length depending on pulse type
         select case(trim(pulsetype))
         case ("tophat")
             getPwr => getPwrTopHat
@@ -422,7 +426,6 @@ subroutine heat_sim_3D(jmean, temp, numpoints, id, numproc, new_comm, right, lef
     ! and time thresholds for burns
 
         use iarray,   only : rhokap
-        use opt_prop,  only : mua, mu_protein
 
         implicit none
 
@@ -448,6 +451,7 @@ subroutine heat_sim_3D(jmean, temp, numpoints, id, numproc, new_comm, right, lef
                             tissue(x,y,z) = tissue(x,y,z) + delt*A*exp(-dE/(R*temp(x,y,z)))
    
                     end if
+                    !calculate threshold times for different thermal injuries
                     if(Threstime(x,y,z,1) == 0.d0 .and. tissue(x,y,z) >= first)then
                         Threstime(x,y,z,1) = time
                     elseif(Threstime(x,y,z,2) == 0.d0 .and. tissue(x,y,z) >= second)then

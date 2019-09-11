@@ -262,15 +262,18 @@ module memoryModule
 
             implicit none
 
-            integer(int64) :: mem_free, available, pagecache, active, inactive, sreclaimable, freeram
-
+            integer(int64)    :: mem_free, available, pagecache, active, inactive, sreclaimable, freeram
             integer(int64)    :: i, low
             character(len=15) :: tmp
             integer           :: u, io
 
 
             open(newunit=u,file='/proc/zoneinfo',status='old')
-            low = 0
+            low = 0_int64
+            sreclaimable = 0_int64
+            inactive = 0_int64
+            freeram = 0_int64
+            active = 0_int64
             do 
                 read(u,*, iostat=io)tmp, i
                 if(IS_IOSTAT_END(io))exit

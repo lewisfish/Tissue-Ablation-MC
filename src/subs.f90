@@ -54,12 +54,10 @@ implicit none
 
             integer , intent(IN) :: numproc, id
 
-            integer(int64) :: limit, cnt, i
+            integer(int64) :: limit
             integer :: N
 
             limit = mem_free()
-            ! cnt = 0_int64
-
 
             call checkallocate(xface, [nxg+1], "xface", numproc)
             call checkallocate(yface, [nyg+1], "yface", numproc)

@@ -23,60 +23,7 @@ CONTAINS
    albedo = mus / kappa
 
    end subroutine init_opt1
-   
-   subroutine init_opt2
-!
-!  subroutine to set tissue optical properties 900nm
-!
-   use opt_prop
 
-   implicit none
-
-   hgg = 0.9
-   g2  = hgg**2.
-   mua = .15
-   mus = 180.65 !/ (1. - hgg)
-
-   kappa  = mus + mua !+ 5.3e-3
-   albedo = mus / kappa
-
-   end subroutine init_opt2
-   
-   subroutine init_opt3
-!
-!  subroutine to set tissue optical properties 1064nm
-!
-   use opt_prop
-
-   implicit none
-
-   hgg = 0.9
-   g2  = hgg**2.
-   mua = .13
-   mus = 9.49 / (1. - hgg) !from s.jacques paper formula using jacques 1996 data
-
-   kappa  = mus + mua !+ 5.3e-3
-   albedo = mus / kappa
-
-   end subroutine init_opt3
-   
-   subroutine init_opt4
-!
-!  subroutine to set tissue optical properties 808nm
-!
-   use opt_prop
-   
-   implicit none
-
-   hgg = 0.7
-   g2  = hgg**2.
-   mua = .23
-   mus = 21. / (1. - hgg)
-
-   kappa  = mus + mua 
-   albedo = mus / kappa
-
-   end subroutine init_opt4
 
    subroutine sample(array, size_of, cdf, wave, iseed)
 !      
@@ -98,6 +45,7 @@ CONTAINS
    
    end subroutine sample
    
+
    subroutine lin_inter_1D(array, cdf, value, length, nlow, y)
 !
 !  linear interpolates between values for an array and its cdf
@@ -113,6 +61,7 @@ CONTAINS
    
    end subroutine lin_inter_1D
    
+
    subroutine lin_inter_2D(array,value,length,nlow,y)
 !
 !  linear interpolation for an array
@@ -128,6 +77,7 @@ CONTAINS
    
    end subroutine lin_inter_2D
    
+
    subroutine search_1D(length,array,nlow,value)
 !
 !  search by bisection for 1D array
@@ -152,6 +102,7 @@ CONTAINS
       end do
    end subroutine search_1D
    
+
    subroutine search_2D(length,array,nlow,value)
 !
 !  search by bisection for 2D array
@@ -176,6 +127,7 @@ CONTAINS
       end do
    end subroutine search_2D
    
+
    subroutine mk_cdf(array,cdf,length)
 !
 !  subroutine that creates cdf for an array of values.

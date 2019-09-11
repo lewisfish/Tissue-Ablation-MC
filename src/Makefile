@@ -2,7 +2,7 @@
 ifeq ($(FCOMP),mpifort)
 FCFLAGS =  -freal-4-real-8 -O2 -march=native -flto
 FCDEBUG = -g -fbacktrace -fcheck=all -fbounds-check -ffpe-trap=invalid,overflow,underflow,denormal
-FCBUILD = -Wall -Wextra -pedantic
+FCBUILD = -Wall -Wextra -pedantic -std=f2008
 else ifeq ($(FCOMP),mpiifort)
 FCFLAGS = -O2 -r8 -xHOST -ipo -heap-arrays
 FCDEBUG = -g -debug -traceback -check all -CB -CU -CA -fpe0
