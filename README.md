@@ -6,6 +6,8 @@
 This repository contains the source codes for the 3D grid Cartesian monte carlo radiation transfer codes developed as part of my phd.
 The codes simulate the transfer of light through tissue/phantoms and calculates the heat induced due to the laser. Heats effect on tissue is also modelled with tissue ablation etc.
 
+[Paper in Lasers in Surgery and Medicine 2020](https://doi.org/10.1002/LSM.23335)
+
 [Thesis chapter on how code operates](https://github.com/lewisfish/Tissue-Ablation-MC/blob/master/chapter-finished.pdf)
 
 
